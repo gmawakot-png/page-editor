@@ -1,0 +1,2857 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Studio Ultra Pro - Integrated Precision Engine</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Premium Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+Devanagari:wght@400;500;600;700;800&family=Noto+Serif+Devanagari:wght@400;700&family=Kalam:wght@400;700&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Engine Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+
+    <style>
+        body { font-family: 'Plus Jakarta Sans', 'Noto Sans Devanagari', sans-serif; }
+        .font-devanagari { font-family: 'Noto Sans Devanagari', sans-serif !important; }
+        .font-devanagari-serif { font-family: 'Noto Serif Devanagari', serif !important; }
+        .font-handwriting { font-family: 'Kalam', cursive !important; }
+        .font-typewriter { font-family: 'Courier Prime', monospace !important; }
+
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+        /* WORKSPACE AREA */
+        #mainWorkspaceArea {
+            flex: 1;
+            overflow: auto;
+            background: #0f172a;
+            position: relative;
+            display: block;
+        }
+
+        #zoomOuterWrapper {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            padding: 80px !important;
+            min-width: 100%;
+            min-height: 100%;
+            width: max-content;
+            height: max-content;
+            box-sizing: border-box !important;
+            margin: auto !important;
+        }
+
+        #fullScreenCanvasContainer {
+            position: relative;
+            display: block;
+            transform-origin: center center !important;
+            transition: transform 0.08s ease-out;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+            border-radius: 4px;
+            background: #ffffff;
+            user-select: none;
+            margin: auto !important;
+        }
+
+        /* NATIVE PDF SELECTABLE TEXT LAYER */
+        .pdf-text-layer {
+            position: absolute;
+            inset: 0;
+            z-index: 45;
+            pointer-events: none;
+            user-select: none !important;
+            -webkit-user-select: text !important;
+            overflow: hidden;
+        }
+        .pdf-text-layer span {
+            position: absolute;
+            color: transparent;
+            cursor: text;
+            white-space: pre;
+            transform-origin: 0% 0%;
+            user-select: none !important;
+            -webkit-user-select: none !important;
+            pointer-events: none !important;
+            line-height: 1.0;
+        }
+        .pdf-text-layer span::selection {
+            background: rgba(99, 102, 241, 0.28) !important;
+            color: transparent !important;
+        }
+
+        .ocr-text-layer {
+            position: absolute; inset: 0; z-index: 46; pointer-events: auto;
+            user-select: none !important; -webkit-user-select: none !important; overflow: hidden;
+        }
+        .ocr-text-layer span {
+            position: absolute; color: transparent; cursor: text; white-space: pre;
+            user-select: none !important; -webkit-user-select: none !important; pointer-events: none !important;
+            line-height: 1; font-family: 'Noto Sans Devanagari', sans-serif;
+        }
+        .ocr-text-layer span::selection {
+            background: rgba(16, 185, 129, 0.30) !important; color: transparent !important;
+        }
+
+        /* SEAMLESS TEXT ITEM */
+        .seamless-text-item {
+            position: absolute;
+            z-index: 50;
+            background: transparent !important;
+            padding: 0px !important;
+            margin: 0px !important;
+            outline: none !important;
+            border: none !important;
+            cursor: move;
+            white-space: pre;
+            word-break: normal;
+            overflow: visible;
+            max-width: none;
+            line-height: 1.15 !important;
+            user-select: none;
+            box-sizing: border-box;
+            display: inline-block;
+            pointer-events: auto;
+            min-width: 5px;
+            min-height: 15px;
+            transform: translateY(0);
+        }
+
+        .seamless-text-item.selected {
+            outline: none !important;
+            background: transparent !important;
+            box-shadow: none !important;
+        }
+        .seamless-text-item.selected.editing {
+            outline: none !important;
+            background: transparent !important;
+        }
+
+        /* DIRECT TYPING MODE */
+        .seamless-text-item.editing { 
+            cursor: text !important; 
+            user-select: text !important;
+            -webkit-user-select: text !important;
+            background: transparent !important;
+            outline: none !important;
+            border: none !important;
+            z-index: 100 !important;
+            pointer-events: auto !important;
+            caret-color: currentColor !important;
+        }
+
+        /* DRAG SELECTION MARQUEE BOX */
+        .selection-marquee {
+            position: absolute;
+            border: 1px dashed #6366f1;
+            background: rgba(99, 102, 241, 0.15);
+            pointer-events: none;
+            z-index: 1000;
+            border-radius: 2px;
+        }
+
+        .eraser-active { cursor: crosshair !important; }
+        #fullScreenCanvasContainer.eraser-mode-active .seamless-text-item,
+        #fullScreenCanvasContainer.eraser-mode-active .pdf-text-layer,
+        #fullScreenCanvasContainer.eraser-mode-active .ocr-text-layer {
+            pointer-events: none !important;
+        }
+        .panning-active { cursor: grabbing !important; }
+
+        .editor-eraser-preview { 
+            position: absolute; 
+            z-index: 99999 !important; 
+            pointer-events: none !important; 
+            box-sizing: border-box;
+            background: rgba(236, 72, 153, 0.35); 
+            border: 2px dashed rgba(219, 39, 119, 1); 
+        }
+
+        .precision-eraser-preview {
+            position: absolute;
+            z-index: 100000;
+            pointer-events: auto;
+            cursor: grab;
+            border: 2px dashed #db2777;
+            background: rgba(236,72,153,.25);
+            border-radius: 50%;
+            box-sizing: border-box;
+        }
+
+        .straighten-overlay {
+            position: absolute;
+            inset: 0;
+            z-index: 90000;
+            pointer-events: none;
+            background: rgba(15, 23, 42, 0.45);
+        }
+
+        .straighten-svg-layer {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .straighten-point {
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            margin: -11px 0 0 -11px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            border: 2.5px solid #0284c7;
+            box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.9), 0 4px 12px rgba(0,0,0,0.5);
+            pointer-events: auto;
+            cursor: move;
+            backdrop-filter: blur(2px);
+            z-index: 90002;
+        }
+
+        /* Toast notification popup */
+        #toastNotification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #1e293b;
+            color: #ffffff;
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: bold;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            border: 1px solid #334155;
+            z-index: 999999;
+            display: none;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+
+        @media print {
+            @page { margin: 0; size: auto; }
+            body { background: white !important; overflow: visible !important; display: block !important; padding: 0 !important; }
+            header, aside, .sticky, #canvasPlaceholder { display: none !important; }
+            main { overflow: visible !important; display: block !important; }
+            #mainWorkspaceArea { overflow: visible !important; background: white !important; display: block !important; }
+            #zoomOuterWrapper { padding: 0 !important; margin: 0 !important; display: block !important; width: 100% !important; height: auto !important; }
+            #fullScreenCanvasContainer { 
+                transform: scale(1) !important; 
+                box-shadow: none !important; 
+                border: none !important; 
+                margin: 0 auto !important;
+            }
+            .seamless-text-item { outline: none !important; background: transparent !important; }
+            .pdf-text-layer { display: none !important; }
+        }
+    
+        #fullScreenCanvasContainer.move-mode-active,
+        #fullScreenCanvasContainer.move-mode-active canvas {
+            cursor: crosshair !important;
+        }
+        #moveSelectionBox {
+            user-select:none;
+            background: transparent !important;
+            border: 1px dashed rgba(37, 99, 235, 0.85) !important;
+            box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.8);
+        }
+
+        /* CLEAN FLOATING PASTED ELEMENT STYLE - NO BORDER/BOX */
+        #floatingPastedElement {
+            position: absolute;
+            z-index: 9998;
+            cursor: move;
+            border: none !important; /* बीना किसी बॉक्स/बॉर्डर के बिल्कुल क्लीन */
+            box-shadow: none !important;
+            outline: none !important;
+            user-select: none;
+            touch-action: none;
+            box-sizing: border-box;
+            background: transparent;
+        }
+
+        /* Text editing is disabled ONLY while Move Mode is ON.
+           When Move is OFF, double-click works normally again. */
+        body.move-mode-enabled .seamless-text-item {
+            pointer-events: none !important;
+            user-select: none !important;
+        }
+</style>
+</head>
+<body class="bg-slate-100 text-slate-800 h-screen flex flex-col overflow-hidden select-none">
+
+    <!-- TOAST NOTIFICATION -->
+    <div id="toastNotification">
+        <i class="fa-solid fa-circle-info text-indigo-400"></i>
+        <span id="toastText">संदेश</span>
+    </div>
+
+    <!-- MAIN APP HEADER -->
+    <header class="bg-white border-b border-slate-200 h-14 shrink-0 px-4 flex items-center justify-between z-40 shadow-sm">
+        <div class="flex items-center space-x-3">
+            <div class="bg-indigo-600 text-white w-8 h-8 rounded-lg shadow-md flex items-center justify-center">
+                <i class="fa-solid fa-layer-group text-sm"></i>
+            </div>
+            <div>
+                <h1 class="text-sm font-extrabold text-slate-900 leading-tight">Studio Ultra Pro</h1>
+                <p class="text-[10px] font-semibold text-slate-500">Precision Canvas Document Engine</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-1.5">
+            <button id="moveModeBtn" type="button" class="bg-slate-700 hover:bg-slate-800 text-white px-3 py-1.5 rounded-lg font-bold text-xs transition">
+                <i class="fa-solid fa-arrows-up-down-left-right"></i> Move
+            </button>
+            <button id="moveCutBtn" type="button" class="bg-rose-600 hover:bg-rose-700 text-white px-2.5 py-1.5 rounded-lg font-bold text-xs transition" title="Cut selected area">
+                <i class="fa-solid fa-scissors"></i> Cut
+            </button>
+            <button id="moveCopyBtn" type="button" class="bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1.5 rounded-lg font-bold text-xs transition" title="Copy selected area">
+                <i class="fa-regular fa-copy"></i> Copy
+            </button>
+            <button id="movePasteBtn" type="button" class="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1.5 rounded-lg font-bold text-xs transition" title="Paste selected area">
+                <i class="fa-solid fa-paste"></i> Paste
+            </button>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <button onclick="triggerCleanPrint()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-1.5 rounded-lg font-bold text-xs shadow transition flex items-center gap-1.5">
+                <i class="fa-solid fa-print"></i> प्रिंट निकालें
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN DASHBOARD -->
+    <main class="flex-1 flex overflow-hidden">
+
+        <!-- DASHBOARD SIDEBAR -->
+        <aside class="w-[280px] bg-slate-50 border-r border-slate-200 p-2.5 flex flex-col gap-2 overflow-y-auto shrink-0 shadow-sm h-full">
+            
+            <!-- UPLOADER -->
+            <div class="bg-white border border-slate-200 rounded-xl p-2.5 shadow-sm">
+                <div class="flex items-center justify-between mb-1.5">
+                    <span class="text-xs font-extrabold text-slate-800 uppercase"><i class="fa-solid fa-file-pdf text-red-500 mr-1"></i> फाइल लोड करें</span>
+                    <span class="text-[10px] text-slate-400 font-bold">PDF, JPG, PNG</span>
+                </div>
+
+                <div class="border border-dashed border-slate-300 hover:border-indigo-500 rounded-xl p-2 text-center bg-slate-50 cursor-pointer transition" onclick="document.getElementById('universalFileInput').click()">
+                    <i class="fa-solid fa-cloud-arrow-up text-base text-slate-400 mb-0.5"></i>
+                    <p class="text-[11px] font-bold text-slate-700">फाइल अपलोड करने हेतु क्लिक करें</p>
+                    <input type="file" id="universalFileInput" accept="application/pdf,image/*" class="hidden" onchange="handleUniversalUpload(event); this.value=''">
+                </div>
+
+                <div id="loadedFileInfo" class="hidden mt-2 bg-indigo-50 border border-indigo-100 p-1.5 rounded-lg flex items-center justify-between text-xs text-indigo-900 font-bold">
+                    <span id="loadedFileNameDisplay" class="truncate max-w-[140px] text-[11px]">doc.pdf</span>
+                    <span id="loadedFileSizeDisplay" class="bg-indigo-200 px-1.5 py-0.5 rounded text-[9px]">0 KB</span>
+                </div>
+            </div>
+
+            <!-- MULTI-PAGE NAVIGATION CONTROLS -->
+            <div id="multiPageControls" class="hidden bg-indigo-900 text-white rounded-xl p-2 shadow-sm flex items-center justify-between text-xs font-bold">
+                <button onclick="changePdfPage(-1)" class="bg-indigo-700 hover:bg-indigo-600 px-2.5 py-1 rounded-lg transition"><i class="fa-solid fa-chevron-left"></i> पिछला</button>
+                <span id="pageIndicatorText" class="text-indigo-200 text-[11px]">पेज 1 / 1</span>
+                <button onclick="changePdfPage(1)" class="bg-indigo-700 hover:bg-indigo-600 px-2.5 py-1 rounded-lg transition">अगला <i class="fa-solid fa-chevron-right"></i></button>
+            </div>
+
+            <!-- FONT FAMILY & INK CONTROLS -->
+            <div class="bg-indigo-50/80 border border-indigo-200 rounded-xl p-2.5 shadow-sm space-y-2 shrink-0">
+                <div class="text-[11px] font-extrabold uppercase text-indigo-700 tracking-wider">फॉन्ट व स्याही सेटिंग्स</div>
+                
+                <div>
+                    <label class="text-[11px] font-bold text-slate-700 block mb-0.5">फॉन्ट शैली (Font Style):</label>
+                    <select id="editorFontFamily" onchange="applyFontToActiveText()" class="w-full bg-white border border-slate-300 rounded-lg p-1 text-xs font-bold text-indigo-950 outline-none shadow-sm">
+                        <option value="font-devanagari">प्रिंट हिंदी (Modern Sans)</option>
+                        <option value="font-devanagari-serif">सरकारी फॉर्म (Serif Print)</option>
+                        <option value="font-handwriting">हस्तलेखन (Real Ink Pen)</option>
+                        <option value="font-typewriter">टाइपराइटर (Typewriter)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="text-[11px] font-bold text-slate-700 block mb-0.5">स्याही टोन (Ink Tone):</label>
+                    <select id="editorInkColor" onchange="applyPresetInkColor(this.value)" class="w-full bg-white border border-slate-300 rounded-lg p-1 text-xs font-bold text-slate-800 outline-none shadow-sm">
+                        <option value="#22252a">🖤 ओरिजिनल स्याही (Charcoal)</option>
+                        <option value="#1e3a8a">💙 नीली स्याही (Blue Ballpen)</option>
+                        <option value="#374151">🩶 हल्का फीका प्रिंट (Light Faded)</option>
+                        <option value="#000000">🖤 गहरा काला (Pure Black)</option>
+                    </select>
+                </div>
+
+                <!-- INK OPACITY SLIDER -->
+                <div class="bg-white p-1.5 rounded-lg border border-indigo-100 shadow-sm">
+                    <div class="flex justify-between items-center text-[11px] font-bold text-slate-700 mb-0.5">
+                        <span>स्याही का गाढ़ापन:</span>
+                        <span id="inkOpacityVal" class="text-indigo-600 font-extrabold">88%</span>
+                    </div>
+                    <input type="range" id="inkOpacityRange" min="40" max="100" value="88" oninput="updateInkOpacityLabel()" class="w-full accent-indigo-600 cursor-pointer h-1 bg-slate-200 rounded">
+                </div>
+
+                <!-- TEXT BLUR / CLARITY SLIDER -->
+                <div class="bg-white p-1.5 rounded-lg border border-indigo-100 shadow-sm">
+                    <div class="flex justify-between items-center text-[11px] font-bold text-slate-700 mb-0.5">
+                        <span>शब्द धुंधलापन (Blur / Clarity):</span>
+                        <span id="textBlurVal" class="text-indigo-600 font-extrabold">0px</span>
+                    </div>
+                    <input type="range" id="textBlurRange" min="0" max="4" step="0.2" value="0" oninput="updateTextBlurLabel()" class="w-full accent-indigo-600 cursor-pointer h-1 bg-slate-200 rounded">
+                </div>
+
+                <!-- FONT SIZE & WEIGHT ADJUSTMENTS -->
+                <div class="grid grid-cols-2 gap-1.5">
+                    <div class="flex items-center justify-between bg-white p-1.5 rounded-lg border border-indigo-100 shadow-sm">
+                        <span class="text-[11px] font-bold text-slate-700">साइज:</span>
+                        <div class="flex items-center gap-1">
+                            <button onmousedown="event.preventDefault()" onclick="adjustSelectedFontSize(-2)" class="w-4 h-4 rounded bg-slate-100 font-extrabold text-xs text-slate-700 hover:bg-indigo-600 hover:text-white flex items-center justify-center">-</button>
+                            <span id="fontSizeVal" class="text-[11px] font-extrabold text-indigo-700 min-w-[20px] text-center">24px</span>
+                            <button onmousedown="event.preventDefault()" onclick="adjustSelectedFontSize(2)" class="w-4 h-4 rounded bg-slate-100 font-extrabold text-xs text-slate-700 hover:bg-indigo-600 hover:text-white flex items-center justify-center">+</button>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between bg-white p-1.5 rounded-lg border border-indigo-100 shadow-sm">
+                        <span class="text-[11px] font-bold text-slate-700">मोटाई:</span>
+                        <div class="flex items-center gap-1">
+                            <button onmousedown="event.preventDefault()" onclick="adjustSelectedFontWeight(-100)" class="w-4 h-4 rounded bg-slate-100 font-extrabold text-xs text-slate-700 hover:bg-indigo-600 hover:text-white flex items-center justify-center">-</button>
+                            <span id="fontWeightVal" class="text-[11px] font-extrabold text-indigo-700 min-w-[20px] text-center">400</span>
+                            <button onmousedown="event.preventDefault()" onclick="adjustSelectedFontWeight(100)" class="w-4 h-4 rounded bg-slate-100 font-extrabold text-xs text-slate-700 hover:bg-indigo-600 hover:text-white flex items-center justify-center">+</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between bg-white p-1.5 rounded-lg border border-indigo-100 shadow-sm">
+                    <span class="text-[11px] font-bold text-slate-700">कस्टम रंग:</span>
+                    <div class="flex items-center gap-1.5">
+                        <input type="color" id="liveInkColor" value="#22252a" onchange="applySelectedInkColor(this.value)" class="w-5 h-5 p-0 border border-slate-300 rounded cursor-pointer">
+                        <button onmousedown="event.preventDefault()" onclick="pickColorFromDocument()" class="bg-indigo-50 hover:bg-indigo-100 border border-indigo-300 text-indigo-800 px-1.5 py-0.5 rounded text-[10px] font-bold flex items-center gap-1">
+                            <i class="fa-solid fa-pipette text-indigo-600"></i> पिकर
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ERASER TOOLS -->
+            <div class="bg-pink-50/80 border border-pink-200 rounded-xl p-2.5 shadow-sm space-y-2 shrink-0">
+                <div class="text-[11px] font-extrabold uppercase text-pink-700 tracking-wider">रबड़ (Canvas Eraser)</div>
+                
+                <button onmousedown="event.preventDefault()" id="eraserToggleBtn" onclick="toggleEraserTool()" class="w-full bg-white hover:bg-pink-600 text-slate-800 hover:text-white py-1 rounded-lg text-xs font-extrabold border border-pink-300 transition flex items-center justify-center gap-1 shadow-sm">
+                    <i class="fa-solid fa-eraser text-pink-500"></i> <span id="eraserBtnText">रबड़ मोड चालू करें</span>
+                </button>
+
+                <div class="space-y-0.5 bg-white p-1.5 rounded-lg border border-pink-100 shadow-sm">
+                    <div class="flex justify-between items-center text-[11px] font-bold text-pink-900">
+                        <span>आकार:</span>
+                        <span id="eraserSizeVal" class="font-extrabold">25px</span>
+                    </div>
+                    <input type="range" id="eraserSizeRange" min="5" max="150" value="25" oninput="updateEraserBrushSize()" class="w-full accent-pink-600 cursor-pointer h-1 bg-slate-200 rounded">
+                </div>
+
+                <div class="flex gap-1.5">
+                    <button onmousedown="event.preventDefault()" onclick="setEraserShape('rect')" id="eraserRectBtn" class="flex-1 bg-pink-600 text-white py-1 rounded-lg text-[11px] font-bold shadow-sm">▭ आयत</button>
+                    <button onmousedown="event.preventDefault()" onclick="setEraserShape('circle')" id="eraserCircleBtn" class="flex-1 bg-white text-slate-700 py-1 rounded-lg text-[11px] font-bold border border-pink-300 shadow-sm">◯ गोलाकार</button>
+                </div>
+
+                <!-- ERASER CUSTOM COLOR OPTION -->
+                <div class="flex items-center justify-between bg-white p-1.5 rounded-lg border border-pink-100 shadow-sm">
+                    <span class="text-[11px] font-bold text-pink-950">रबड़ का रंग:</span>
+                    <div class="flex items-center gap-1.5">
+                        <input type="color" id="eraserColor" value="#ffffff" class="w-5 h-5 p-0 border border-slate-300 rounded cursor-pointer">
+                        <button onmousedown="event.preventDefault()" onclick="pickEraserColorFromDocument()" class="bg-pink-50 hover:bg-pink-100 border border-pink-300 text-pink-800 px-1.5 py-0.5 rounded text-[10px] font-bold flex items-center gap-1">
+                            <i class="fa-solid fa-pipette text-pink-600"></i> रंग चुनें
+                        </button>
+                    </div>
+                </div>
+
+                <button onmousedown="event.preventDefault()" onclick="erasePrecisionSelection()" class="w-full bg-pink-100 hover:bg-pink-600 hover:text-white text-pink-900 py-1 rounded-lg text-[11px] font-extrabold border border-pink-200 transition shadow-sm">
+                    चयनित गोलाकार भाग मिटाएँ
+                </button>
+            </div>
+
+            <!-- ADVANCED UTILITIES -->
+            <div class="bg-amber-50/80 border border-amber-200 rounded-xl p-2.5 shadow-sm space-y-1.5 shrink-0">
+                <div class="text-[11px] font-extrabold uppercase text-amber-800 tracking-wider">एडवांस टूल (Straighten & OCR)</div>
+                
+                <button onmousedown="event.preventDefault()" onclick="startStraightenTool()" id="straightenBtn" class="w-full bg-white hover:bg-sky-600 hover:text-white text-sky-900 py-1 rounded-lg text-xs font-extrabold border border-sky-300 transition flex items-center justify-center gap-1 shadow-sm">
+                    <i class="fa-solid fa-crop-simple text-sky-600"></i> फोटो सीधा करें (Straighten)
+                </button>
+
+                <div id="straightenControls" class="hidden flex gap-1.5">
+                    <button onmousedown="event.preventDefault()" onclick="applyStraightenTool()" class="flex-1 bg-sky-600 text-white py-1 rounded-lg text-xs font-extrabold shadow-sm">✓ सीधा करें</button>
+                    <button onmousedown="event.preventDefault()" onclick="cancelStraightenTool()" class="flex-1 bg-white text-slate-700 py-1 rounded-lg text-xs font-bold border border-slate-300 shadow-sm">रद्द</button>
+                </div>
+
+                <button onmousedown="event.preventDefault()" onclick="reloadOriginalCanvasState()" class="w-full bg-white hover:bg-red-50 text-red-600 py-1 rounded-lg text-xs font-bold border border-red-200 transition shadow-sm">
+                    कैनवास रीसेट करें
+                </button>
+            </div>
+
+            <!-- BRIGHTNESS / CONTRAST -->
+            <div class="bg-white border border-slate-200 rounded-xl p-2.5 shadow-sm space-y-1.5 shrink-0">
+                <div class="text-[11px] font-extrabold uppercase text-slate-500 tracking-wider">लाइटिंग (Lighting Controls)</div>
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-sun text-amber-500 text-xs"></i>
+                    <input type="range" id="brightnessRange" min="50" max="180" value="100" oninput="applyImageFilters()" class="w-full accent-amber-500 cursor-pointer h-1 bg-slate-200 rounded">
+                </div>
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-circle-half-stroke text-indigo-600 text-xs"></i>
+                    <input type="range" id="contrastRange" min="50" max="200" value="100" oninput="applyImageFilters()" class="w-full accent-indigo-600 cursor-pointer h-1 bg-slate-200 rounded">
+                </div>
+            </div>
+
+            <!-- EXPORT SECTION -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-2.5 space-y-2 mt-auto text-white shadow-md">
+                <div class="flex items-center justify-between">
+                    <label class="text-xs font-extrabold block text-slate-200"><i class="fa-solid fa-download text-indigo-400 mr-1"></i> एक्सपोर्ट व डाउनलोड</label>
+                </div>
+
+                <!-- TARGET FILE SIZE OPTION -->
+                <div class="border-t border-slate-700 pt-1.5">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-[10px] font-bold text-slate-300">Target Size Limit</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="targetSizeToggle" onchange="toggleTargetSizeState()" class="sr-only peer">
+                            <div class="w-7 h-3.5 bg-slate-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[1px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-pink-500"></div>
+                        </label>
+                    </div>
+
+                    <div id="targetInputs" class="grid grid-cols-3 gap-1 opacity-40 pointer-events-none transition-all">
+                        <div class="col-span-2">
+                            <input type="number" id="targetSizeValue" value="5" class="w-full bg-slate-800 border border-slate-700 rounded p-1 text-xs font-bold text-white">
+                        </div>
+                        <div>
+                            <select id="targetSizeUnit" class="w-full bg-slate-800 border border-slate-700 rounded p-1 text-xs font-bold text-white">
+                                <option value="KB">KB</option>
+                                <option value="MB" selected>MB</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex gap-1.5 pt-0.5">
+                    <select id="exportFormat" class="flex-1 bg-slate-800 border border-slate-700 text-white rounded-lg p-1 text-xs font-bold outline-none">
+                        <option value="pdf">PDF Document (.pdf)</option>
+                        <option value="jpg">JPG Image (.jpg)</option>
+                        <option value="png">PNG Image (.png)</option>
+                        <option value="txt">Text File (.txt)</option>
+                    </select>
+
+                    <button onclick="processExport()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold px-2.5 py-1 rounded-lg shadow text-xs transition">
+                        डाउनलोड
+                    </button>
+                </div>
+            </div>
+
+        </aside>
+
+        <!-- RIGHT WORKSPACE AREA -->
+        <section id="mainWorkspaceArea" class="flex-1 relative overflow-auto">
+            
+            <!-- TOP FLOATING TOOLBAR (ZOOM CONTROLS) -->
+            <div class="sticky top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 bg-slate-900/90 backdrop-blur-md text-white px-4 py-2 rounded-2xl shadow-xl border border-slate-700/80 w-max mx-auto">
+                <span class="text-xs font-bold text-slate-300 mr-2 flex items-center gap-1.5">
+                    <i class="fa-solid fa-magnifying-glass text-indigo-400"></i> Zoom:
+                </span>
+                <button onclick="adjustZoom(-0.1)" class="w-7 h-7 flex items-center justify-center hover:bg-slate-700 rounded-lg font-black text-white text-sm transition" title="Zoom Out">-</button>
+                <span id="zoomVal" class="text-xs font-extrabold px-2 text-indigo-400 min-w-[45px] text-center">100%</span>
+                <button onclick="adjustZoom(0.1)" class="w-7 h-7 flex items-center justify-center hover:bg-slate-700 rounded-lg font-black text-white text-sm transition" title="Zoom In">+</button>
+                <button onclick="resetZoom()" class="ml-1 px-2.5 py-1 text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-600 transition">Reset (100%)</button>
+            </div>
+
+            <!-- CANVAS WORKSPACE CONTAINER -->
+            <div id="zoomOuterWrapper">
+                <div id="fullScreenCanvasContainer" style="transform: scale(1.0);" class="relative bg-white shadow-2xl rounded border border-slate-700">
+                    <div id="canvasPlaceholder" class="p-16 text-center text-slate-400">
+                        <i class="fa-solid fa-file-circle-plus text-5xl mb-3 text-slate-600 block"></i>
+                        <p class="font-extrabold text-sm text-slate-300">कोई फाइल लोड नहीं है</p>
+                        <p class="text-xs text-slate-500 mt-1">बाईं तरफ साइडबार से PDF या फोटो अपलोड करें</p>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- JAVASCRIPT ENGINE -->
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        let pagesData = []; 
+        let currentPageIndex = 0;
+        let currentZoom = 1.0;
+
+        let isEraserMode = false;
+        let isErasing = false;
+        
+        let masterCanvas = null;
+        let masterCtx = null;
+        
+        let eraserBrushSize = 25;
+        let eraserShape = 'rect';
+        let eraserStart = null;
+        let eraserPreview = null;
+        let precisionEraser = { active: false, center: null, radius: 25, handle: null };
+        let straightenState = null;
+
+        let selectedTextElems = [];
+        let selectedTextElem = null;
+        let undoStack = [];
+        let redoStack = [];
+
+        let loadedOriginalFileName = "document";
+
+        // DRAG SELECTION ENGINE VARIABLES
+        let isBoxSelecting = false;
+        let boxSelectStart = { x: 0, y: 0, clientX: 0, clientY: 0 };
+        let marqueeElem = null;
+
+        // KEYBOARD SHORTCUTS & PANNING ENGINE
+        let isSpacePressed = false;
+        let isPanning = false;
+        let startPanX = 0, startPanY = 0;
+        let initialScrollLeft = 0, initialScrollTop = 0;
+
+        // Track last click position for precise pasting
+        let lastClickCanvasPos = { x: 50, y: 50 };
+
+        function showToast(msg) {
+            const toast = document.getElementById('toastNotification');
+            document.getElementById('toastText').innerText = msg;
+            toast.style.display = 'flex';
+            setTimeout(() => { toast.style.display = 'none'; }, 2800);
+        }
+
+        // PREVENT EXTERNAL SYSTEM TEXT PASTE WHEN NOT EDITING TEXT
+        document.addEventListener('paste', (e) => {
+            const active = document.activeElement;
+            const isEditingText = active && (
+                active.tagName === 'INPUT' || 
+                active.tagName === 'TEXTAREA' || 
+                active.classList.contains('editing')
+            );
+
+            if (!isEditingText) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                // If internal copied image exists, paste it!
+                if (moveMode && moveClipboard) {
+                    pasteMoveSelectionAt(lastClickCanvasPos.x, lastClickCanvasPos.y);
+                } else {
+                    // Check external clipboard images
+                    const items = (e.clipboardData || window.clipboardData)?.items;
+                    if (items) {
+                        for (let item of items) {
+                            if (item.type.indexOf('image') !== -1) {
+                                const blob = item.getAsFile();
+                                const reader = new FileReader();
+                                reader.onload = function(event) {
+                                    const img = new Image();
+                                    img.onload = function() {
+                                        const tempCanvas = document.createElement('canvas');
+                                        tempCanvas.width = img.width;
+                                        tempCanvas.height = img.height;
+                                        tempCanvas.getContext('2d').drawImage(img, 0, 0);
+                                        moveClipboard = { canvas: tempCanvas, w: img.width, h: img.height };
+                                        pasteMoveSelectionAt(lastClickCanvasPos.x, lastClickCanvasPos.y);
+                                    };
+                                    img.src = event.target.result;
+                                };
+                                reader.readAsDataURL(blob);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }, true);
+
+        // REMOVE OUTLINES AND DESELECT ALL TEXT WHEN CLICKING OUTSIDE
+        document.addEventListener('mousedown', (e) => {
+            if (!e.target.closest('.seamless-text-item') && 
+                !e.target.closest('aside') && 
+                !e.target.closest('header') &&
+                !e.target.closest('.sticky')) {
+                deselectAllText();
+            }
+        });
+
+        window.addEventListener('keydown', (e) => {
+            const workspace = document.getElementById('mainWorkspaceArea');
+            const active = document.activeElement;
+            
+            const isTyping = active && (
+                active.tagName === 'INPUT' || 
+                active.tagName === 'TEXTAREA' || 
+                active.classList.contains('editing')
+            );
+
+            // GLOBAL KEYBOARD SHORTCUTS
+            if (e.ctrlKey || e.metaKey) {
+                const key = e.key.toLowerCase();
+
+                if ((key === 'c' || key === 'x' || key === 'v') && isTyping) {
+                    return;
+                }
+
+                if (key === 'z') {
+                    e.preventDefault();
+                    if (e.shiftKey) performRedo();
+                    else performUndo();
+                    return;
+                }
+                if (key === 'y') {
+                    e.preventDefault();
+                    performRedo();
+                    return;
+                }
+                if (key === 'b' && !moveMode) {
+                    e.preventDefault();
+                    toggleSelectedBold();
+                    return;
+                }
+                if (key === 'i' && !moveMode) {
+                    e.preventDefault();
+                    toggleSelectedItalic();
+                    return;
+                }
+                if (key === 'u' && !moveMode) {
+                    e.preventDefault();
+                    toggleSelectedUnderline();
+                    return;
+                }
+            }
+
+            if (isTyping) return;
+
+            const isArrow = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key);
+
+            // FLOATING PASTED ITEM MOVEMENT (Works everywhere, even if Move Mode is OFF)
+            if (activePastedData && isArrow) {
+                e.preventDefault();
+                e.stopPropagation();
+                const step = e.shiftKey ? 5 : 1;
+
+                if (e.key === 'ArrowLeft')  activePastedData.x -= step;
+                if (e.key === 'ArrowRight') activePastedData.x += step;
+                if (e.key === 'ArrowUp')    activePastedData.y -= step;
+                if (e.key === 'ArrowDown')  activePastedData.y += step;
+
+                activePastedData.x = Math.max(0, Math.min(masterCanvas.width - activePastedData.w, activePastedData.x));
+                activePastedData.y = Math.max(0, Math.min(masterCanvas.height - activePastedData.h, activePastedData.y));
+
+                updateFloatingPastedDOMPosition();
+                return;
+            }
+
+            if (activePastedData && (e.key === 'Enter' || e.key === 'Escape')) {
+                e.preventDefault();
+                commitActivePastedObject();
+                showToast("पेस्ट लॉक हो गया");
+                return;
+            }
+
+            // ACCURATE ARROW KEY MOVEMENT FOR SELECTED TEXT
+            if (!moveMode && selectedTextElems.length > 0 && isArrow) {
+                e.preventDefault();
+                const nudgeStep = e.shiftKey ? 1 : 0.25;
+
+                const beforeArrowMove = captureTextEdits();
+
+                selectedTextElems.forEach(elem => {
+                    let curX = parseFloat(elem.dataset.canvasX) || 0;
+                    let curY = parseFloat(elem.dataset.canvasY) || 0;
+
+                    if (e.key === 'ArrowLeft') curX -= nudgeStep;
+                    if (e.key === 'ArrowRight') curX += nudgeStep;
+                    if (e.key === 'ArrowUp') curY -= nudgeStep;
+                    if (e.key === 'ArrowDown') curY += nudgeStep;
+
+                    if (masterCanvas) {
+                        curX = Math.max(0, Math.min(masterCanvas.width - 10, curX));
+                        curY = Math.max(0, Math.min(masterCanvas.height - 10, curY));
+                    }
+                    updateTextElemPosition(elem, curX, curY);
+                });
+
+                if (pagesData[currentPageIndex]) {
+                    pagesData[currentPageIndex].texts = captureTextEdits();
+                }
+
+                if (!window.__arrowUndoActive) {
+                    window.__arrowUndoActive = true;
+                    undoStack.push({
+                        canvasData: masterCanvas.toDataURL(),
+                        texts: beforeArrowMove
+                    });
+                    if (undoStack.length > 35) undoStack.shift();
+                    redoStack = [];
+                }
+                return;
+            }
+
+            if (e.code === 'Space') {
+                isSpacePressed = true;
+                if (workspace) workspace.classList.add('panning-active');
+                e.preventDefault();
+            }
+
+            if (selectedTextElems.length === 0 && !moveMode && isArrow && workspace) {
+                const step = e.shiftKey ? 150 : 60;
+                if (e.key === 'ArrowLeft') workspace.scrollLeft -= step;
+                if (e.key === 'ArrowRight') workspace.scrollLeft += step;
+                if (e.key === 'ArrowUp') workspace.scrollTop -= step;
+                if (e.key === 'ArrowDown') workspace.scrollTop += step;
+                e.preventDefault();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.code === 'Space') {
+                isSpacePressed = false;
+                const workspace = document.getElementById('mainWorkspaceArea');
+                if (workspace) workspace.classList.remove('panning-active');
+            }
+
+            if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+                window.__arrowUndoActive = false;
+            }
+        });
+
+        const workspaceArea = document.getElementById('mainWorkspaceArea');
+        workspaceArea.addEventListener('mousedown', (e) => {
+            if (isSpacePressed || e.button === 1) {
+                isPanning = true;
+                startPanX = e.clientX;
+                startPanY = e.clientY;
+                initialScrollLeft = workspaceArea.scrollLeft;
+                initialScrollTop = workspaceArea.scrollTop;
+                workspaceArea.classList.add('panning-active');
+                e.preventDefault();
+            }
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!isPanning) return;
+            const dx = e.clientX - startPanX;
+            const dy = e.clientY - startPanY;
+            workspaceArea.scrollLeft = initialScrollLeft - dx;
+            workspaceArea.scrollTop = initialScrollTop - dy;
+        });
+
+        window.addEventListener('mouseup', () => {
+            isPanning = false;
+            if (!isSpacePressed) workspaceArea.classList.remove('panning-active');
+        });
+
+        window.addEventListener('keydown', function(e) {
+            if (e.ctrlKey || e.metaKey) {
+                if (e.key === '=' || e.key === '+' || e.key === '-' || e.key === '0') {
+                    e.preventDefault();
+                    if (e.key === '=' || e.key === '+') adjustZoom(0.1);
+                    if (e.key === '-') adjustZoom(-0.1);
+                    if (e.key === '0') resetZoom();
+                }
+            }
+        });
+
+        document.addEventListener('wheel', function(e) {
+            if (e.ctrlKey) {
+                e.preventDefault();
+                adjustZoom(e.deltaY < 0 ? 0.08 : -0.08);
+            }
+        }, { passive: false });
+        
+        function getCanvasNativeCoordinates(clientX, clientY) {
+            if (!masterCanvas) return { x: 0, y: 0 };
+            const rect = masterCanvas.getBoundingClientRect();
+            const scaleX = masterCanvas.width / rect.width;
+            const scaleY = masterCanvas.height / rect.height;
+            
+            return {
+                x: Math.max(0, Math.min(masterCanvas.width, (clientX - rect.left) * scaleX)),
+                y: Math.max(0, Math.min(masterCanvas.height, (clientY - rect.top) * scaleY))
+            };
+        }
+
+        function toggleSelectedBold() {
+            if (selectedTextElems.length === 0) return;
+            saveUndoState();
+            selectedTextElems.forEach(el => {
+                const isBold = el.style.fontWeight === 'bold' || parseInt(el.style.fontWeight) >= 700;
+                el.style.fontWeight = isBold ? 'normal' : 'bold';
+            });
+        }
+
+        function toggleSelectedItalic() {
+            if (selectedTextElems.length === 0) return;
+            saveUndoState();
+            selectedTextElems.forEach(el => {
+                const isItalic = el.style.fontStyle === 'italic';
+                el.style.fontStyle = isItalic ? 'normal' : 'italic';
+            });
+        }
+
+        function toggleSelectedUnderline() {
+            if (selectedTextElems.length === 0) return;
+            saveUndoState();
+            selectedTextElems.forEach(el => {
+                const isUnderline = el.style.textDecoration === 'underline';
+                el.style.textDecoration = isUnderline ? 'none' : 'underline';
+            });
+        }
+
+        function applyFontToActiveText() {
+            const selectedFont = document.getElementById('editorFontFamily').value;
+            if (selectedTextElems.length > 0) {
+                saveUndoState();
+                selectedTextElems.forEach(el => {
+                    el.classList.remove('font-devanagari', 'font-devanagari-serif', 'font-handwriting', 'font-typewriter');
+                    el.classList.add(selectedFont);
+                });
+            }
+        }
+
+        function applyPresetInkColor(colorHex) {
+            document.getElementById('liveInkColor').value = colorHex;
+            if (selectedTextElems.length > 0) applySelectedInkColor(colorHex);
+        }
+
+        function updateInkOpacityLabel() {
+            const val = document.getElementById('inkOpacityRange').value;
+            document.getElementById('inkOpacityVal').innerText = `${val}%`;
+            selectedTextElems.forEach(el => {
+                el.style.opacity = (val / 100);
+            });
+        }
+
+        function updateTextBlurLabel() {
+            const val = document.getElementById('textBlurRange').value;
+            document.getElementById('textBlurVal').innerText = `${val}px`;
+            selectedTextElems.forEach(el => {
+                el.dataset.blur = val;
+                el.style.filter = val > 0 ? `blur(${val}px)` : 'none';
+            });
+        }
+
+        async function pickColorFromDocument() {
+            if ('EyeDropper' in window) {
+                try {
+                    const eyeDropper = new EyeDropper();
+                    const result = await eyeDropper.open();
+                    setChosenColor(result.sRGBHex);
+                } catch (e) {}
+            }
+        }
+
+        async function pickEraserColorFromDocument() {
+            if ('EyeDropper' in window) {
+                try {
+                    const eyeDropper = new EyeDropper();
+                    const result = await eyeDropper.open();
+                    document.getElementById('eraserColor').value = result.sRGBHex;
+                } catch (e) {}
+            }
+        }
+
+        function setChosenColor(colorHex) {
+            document.getElementById('liveInkColor').value = colorHex;
+            if (selectedTextElems.length > 0) applySelectedInkColor(colorHex);
+        }
+
+        function toggleTargetSizeState() {
+            const isChecked = document.getElementById('targetSizeToggle').checked;
+            const targetInputs = document.getElementById('targetInputs');
+            if (isChecked) {
+                targetInputs.classList.remove('opacity-40', 'pointer-events-none');
+            } else {
+                targetInputs.classList.add('opacity-40', 'pointer-events-none');
+            }
+        }
+
+        // OCR FOR IMAGE FILES
+        async function runImageOCR(canvas) {
+            if (typeof Tesseract === 'undefined') return [];
+            try {
+                const result = await Tesseract.recognize(canvas, 'hin+eng', {
+                    logger: m => {
+                        if (m && m.status === 'recognizing text' && typeof m.progress === 'number') {
+                            const toast = document.getElementById('toastNotification');
+                            const msg = document.getElementById('toastText');
+                            if (toast && msg) {
+                                msg.innerText = `इमेज का टेक्स्ट पढ़ा जा रहा है... ${Math.round(m.progress * 100)}%`;
+                                toast.style.display = 'flex';
+                            }
+                        }
+                    }
+                });
+                return (result.data?.words || []).filter(w => w?.text?.trim() && w.bbox).map(w => ({
+                    text: w.text, x: Number(w.bbox.x0) || 0, y: Number(w.bbox.y0) || 0,
+                    width: Math.max(2, (Number(w.bbox.x1) || 0) - (Number(w.bbox.x0) || 0)),
+                    height: Math.max(8, (Number(w.bbox.y1) || 0) - (Number(w.bbox.y0) || 0))
+                }));
+            } catch (err) {
+                console.warn('Image OCR failed:', err);
+                return [];
+            }
+        }
+
+        // UNIVERSAL FILE UPLOAD HANDLING
+        async function handleUniversalUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            if (typeof setMoveMode === 'function') setMoveMode(false);
+
+            const container = document.getElementById('fullScreenCanvasContainer');
+            container.innerHTML = `
+                <div class="p-12 text-center text-indigo-400">
+                    <i class="fa-solid fa-spinner fa-spin text-4xl mb-3 text-indigo-500 block"></i>
+                    <p class="font-extrabold text-sm text-slate-700">फाइल लोड हो रही है...</p>
+                </div>
+            `;
+
+            let sizeFormatted = (file.size / 1024).toFixed(1) + " KB";
+            if (file.size > 1024 * 1024) sizeFormatted = (file.size / (1024 * 1024)).toFixed(2) + " MB";
+            
+            loadedOriginalFileName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+
+            document.getElementById('loadedFileNameDisplay').innerText = file.name;
+            document.getElementById('loadedFileSizeDisplay').innerText = sizeFormatted;
+            document.getElementById('loadedFileInfo').classList.remove('hidden');
+
+            pagesData = [];
+            currentPageIndex = 0;
+            undoStack = [];
+            redoStack = [];
+
+            try {
+                if (file.type === 'application/pdf') {
+                    const arrayBuffer = await file.arrayBuffer();
+                    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                    
+                    for (let p = 1; p <= pdf.numPages; p++) {
+                        const page = await pdf.getPage(p);
+                        const viewport = page.getViewport({ scale: 2 });
+
+                        const canvas = document.createElement('canvas');
+                        canvas.height = viewport.height;
+                        canvas.width = viewport.width;
+                        const context = canvas.getContext('2d');
+                        await page.render({ canvasContext: context, viewport: viewport }).promise;
+
+                        const textContent = await page.getTextContent();
+                        const pdfTextItems = textContent.items.map(item => {
+                            const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
+                            const fontHeight = Math.hypot(tx[2], tx[3]) || Math.abs(item.height * viewport.scale) || 12;
+                            return {
+                                str: item.str,
+                                x: tx[4],
+                                y: tx[5] - fontHeight,
+                                fontSize: fontHeight,
+                                width: Math.abs(item.width * viewport.scale),
+                                transform: tx
+                            };
+                        });
+
+                        pagesData.push({
+                            baseCanvas: cloneCanvas(canvas),
+                            rawCanvas: cloneCanvas(canvas),
+                            pdfTextItems: pdfTextItems,
+                            ocrWords: [],
+                            texts: []
+                        });
+                    }
+
+                } else if (file.type.startsWith('image/')) {
+                    await new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onload = function(e) {
+                            const img = new Image();
+                            img.onload = function() {
+                                const canvas = document.createElement('canvas');
+                                canvas.width = img.width;
+                                canvas.height = img.height;
+                                canvas.getContext('2d').drawImage(img, 0, 0);
+                                (async () => {
+                                    const ocrWords = await runImageOCR(canvas);
+                                    pagesData.push({
+                                        baseCanvas: cloneCanvas(canvas),
+                                        rawCanvas: cloneCanvas(canvas),
+                                        pdfTextItems: [],
+                                        ocrWords,
+                                        texts: []
+                                    });
+                                    resolve();
+                                })();
+                            };
+                            img.src = e.target.result;
+                        };
+                        reader.readAsDataURL(file);
+                    });
+                }
+
+                if (pagesData.length > 0) {
+                    updateMultiPageControlsUI();
+                    renderPageInEditor(0);
+                    resetZoom();
+                }
+            } catch (err) {
+                alert('फाइल रेंडर करने में समस्या: ' + err.message);
+            }
+        }
+
+        function updateMultiPageControlsUI() {
+            const ctrl = document.getElementById('multiPageControls');
+            if (pagesData.length > 1) {
+                ctrl.classList.remove('hidden');
+                document.getElementById('pageIndicatorText').innerText = `पेज ${currentPageIndex + 1} / ${pagesData.length}`;
+            } else {
+                ctrl.classList.add('hidden');
+            }
+        }
+
+        function saveCurrentPageInMemory() {
+            if (pagesData[currentPageIndex] && masterCanvas) {
+                pagesData[currentPageIndex].baseCanvas = cloneCanvas(masterCanvas);
+                pagesData[currentPageIndex].texts = captureTextEdits();
+            }
+        }
+
+        function changePdfPage(delta) {
+            const nextIdx = currentPageIndex + delta;
+            if (nextIdx >= 0 && nextIdx < pagesData.length) {
+                commitActivePastedObject();
+                saveCurrentPageInMemory();
+                renderPageInEditor(nextIdx);
+            }
+        }
+
+        function renderPageInEditor(idx) {
+            currentPageIndex = idx;
+            updateMultiPageControlsUI();
+
+            const container = document.getElementById('fullScreenCanvasContainer');
+            document.querySelectorAll('.seamless-text-item, .pdf-text-layer, .ocr-text-layer').forEach(el => el.remove());
+
+            const pageObj = pagesData[currentPageIndex];
+
+            const displayW = 800;
+            const aspect = pageObj.baseCanvas.height / pageObj.baseCanvas.width;
+            const displayH = displayW * aspect;
+
+            container.style.width = `${displayW}px`;
+            container.style.height = `${displayH}px`;
+
+            container.innerHTML = `<canvas id="mainEditorCanvas" width="${pageObj.baseCanvas.width}" height="${pageObj.baseCanvas.height}" class="w-full h-full block rounded"></canvas>`;
+
+            masterCanvas = document.getElementById('mainEditorCanvas');
+            masterCtx = masterCanvas.getContext('2d');
+            masterCtx.drawImage(pageObj.baseCanvas, 0, 0);
+
+            if (pageObj.pdfTextItems && pageObj.pdfTextItems.length > 0) {
+                const textLayer = document.createElement('div');
+                textLayer.className = 'pdf-text-layer';
+
+                pageObj.pdfTextItems.forEach(item => {
+                    if (!item.str.trim()) return;
+                    const span = document.createElement('span');
+                    span.textContent = item.str;
+
+                    const pctX = (item.x / pageObj.baseCanvas.width) * 100;
+                    const pctY = (item.y / pageObj.baseCanvas.height) * 100;
+
+                    span.style.left = `${pctX}%`;
+                    span.style.top = `${pctY}%`;
+                    span.style.fontSize = `${item.fontSize * (displayW / pageObj.baseCanvas.width)}px`;
+                    span.style.width = `${(item.width / pageObj.baseCanvas.width) * 100}%`;
+
+                    span.ondblclick = (e) => {
+                        if(moveMode) return;
+                        e.stopPropagation();
+                        e.preventDefault();
+                        const nativeFontSize = item.fontSize;
+                        const elem = createSeamlessWordStyleText(item.x, item.y, item.str, { nativeFontSize: nativeFontSize }, true, true);
+                        enableTextEditing(elem, true);
+                    };
+
+                    textLayer.appendChild(span);
+                });
+
+                container.appendChild(textLayer);
+            }
+
+            if (pageObj.ocrWords && pageObj.ocrWords.length > 0) {
+                const ocrLayer = document.createElement('div');
+                ocrLayer.className = 'ocr-text-layer';
+                pageObj.ocrWords.forEach(word => {
+                    const span = document.createElement('span');
+                    span.textContent = word.text;
+                    span.dataset.wordX = String(word.x);
+                    span.dataset.wordY = String(word.y);
+                    span.dataset.wordHeight = String(word.height);
+                    span.style.left = `${(word.x / pageObj.baseCanvas.width) * 100}%`;
+                    span.style.top = `${(word.y / pageObj.baseCanvas.height) * 100}%`;
+                    span.style.width = `${(word.width / pageObj.baseCanvas.width) * 100}%`;
+                    span.style.height = `${(word.height / pageObj.baseCanvas.height) * 100}%`;
+                    span.style.fontSize = `${Math.max(10, word.height * (displayH / pageObj.baseCanvas.height))}px`;
+                    span.ondblclick = (e) => {
+                        if(moveMode) return;
+                        e.stopPropagation(); e.preventDefault();
+                        const elem = createSeamlessWordStyleText(word.x, word.y, word.text, { nativeFontSize: word.height }, true, true);
+                        enableTextEditing(elem, true);
+                    };
+                    ocrLayer.appendChild(span);
+                });
+                container.appendChild(ocrLayer);
+            }
+
+            if (pageObj.texts && pageObj.texts.length > 0) {
+                pageObj.texts.forEach(item => {
+                    createSeamlessWordStyleText(item.canvasX, item.canvasY, item.text, item, false, false);
+                });
+            }
+
+            deselectAllText();
+            initDirectCanvasEraserListeners();
+            initBoxSelectionEngine();
+            applyZoomUI();
+            
+            if (undoStack.length === 0) {
+                saveUndoState();
+            }
+        }
+
+        function cloneCanvas(c) {
+            const out = document.createElement('canvas');
+            out.width = c.width; out.height = c.height;
+            out.getContext('2d').drawImage(c, 0, 0);
+            return out;
+        }
+
+        function captureTextEdits() {
+            return [...document.querySelectorAll('.seamless-text-item')].map(el => ({
+                text: el.textContent,
+                canvasX: parseFloat(el.dataset.canvasX) || 0,
+                canvasY: parseFloat(el.dataset.canvasY) || 0,
+                nativeFontSize: parseFloat(el.dataset.nativeFontSize) || 28,
+                color: el.style.color || '#22252a',
+                opacity: el.style.opacity || '1',
+                blur: el.dataset.blur || '0',
+                fontWeight: el.style.fontWeight || '400',
+                fontStyle: el.style.fontStyle || 'normal',
+                textDecoration: el.style.textDecoration || 'none',
+                fontClass: [...el.classList].find(c => c.startsWith('font-')) || 'font-devanagari'
+            }));
+        }
+
+        function reloadOriginalCanvasState() {
+            if (confirm("क्या आप कैनवास रीसेट करना चाहते हैं?")) {
+                if (pagesData.length > 0) {
+                    commitActivePastedObject();
+                    saveUndoState();
+                    pagesData[currentPageIndex].baseCanvas = cloneCanvas(pagesData[currentPageIndex].rawCanvas);
+                    pagesData[currentPageIndex].texts = [];
+                    renderPageInEditor(currentPageIndex);
+                }
+            }
+        }
+
+        function updateTextElemPosition(elem, canvasX, canvasY) {
+            if (!masterCanvas) return;
+            elem.dataset.canvasX = canvasX;
+            elem.dataset.canvasY = canvasY;
+            
+            const pctX = (canvasX / masterCanvas.width) * 100;
+            const pctY = (canvasY / masterCanvas.height) * 100;
+            elem.style.left = `${pctX}%`;
+            elem.style.top = `${pctY}%`;
+
+            const displayScale = (masterCanvas.offsetWidth || 800) / masterCanvas.width;
+            const nativePx = parseFloat(elem.dataset.nativeFontSize || 28);
+            elem.style.fontSize = `${nativePx * displayScale}px`;
+        }
+
+        function createSeamlessWordStyleText(canvasX, canvasY, text = "", opts = {}, saveUndo = true, startEditing = false) {
+            if (saveUndo) saveUndoState();
+            const container = document.getElementById('fullScreenCanvasContainer');
+            const fontStyle = opts.fontClass || document.getElementById('editorFontFamily').value;
+            const inkColor = opts.color || document.getElementById('liveInkColor').value;
+            const opacityVal = opts.opacity !== undefined ? parseFloat(opts.opacity) : (document.getElementById('inkOpacityRange').value / 100);
+            const nativeFontSize = opts.nativeFontSize || 28;
+            const blurVal = opts.blur || document.getElementById('textBlurRange').value || '0';
+
+            const elem = document.createElement('div');
+            elem.className = `seamless-text-item ${fontStyle}`;
+            
+            elem.contentEditable = "false";
+            elem.spellcheck = false;
+            elem.setAttribute('lang', 'hi');
+            elem.innerText = text;
+
+            elem.dataset.nativeFontSize = String(nativeFontSize);
+            elem.dataset.blur = String(blurVal);
+            elem.style.color = inkColor;
+            elem.style.opacity = opacityVal;
+            elem.style.filter = blurVal > 0 ? `blur(${blurVal}px)` : 'none';
+            elem.style.fontWeight = String(opts.fontWeight || '400');
+            if (opts.fontStyle) elem.style.fontStyle = opts.fontStyle;
+            if (opts.textDecoration) elem.style.textDecoration = opts.textDecoration;
+
+            updateTextElemPosition(elem, canvasX, canvasY);
+
+            container.appendChild(elem);
+            makeElementMouseDraggable(elem);
+
+            if (startEditing) {
+                enableTextEditing(elem, true);
+            } else {
+                selectTextElem(elem);
+            }
+
+            elem.addEventListener('input', () => {
+                elem.style.whiteSpace = 'pre';
+                elem.style.wordBreak = 'normal';
+                if (pagesData[currentPageIndex]) {
+                    pagesData[currentPageIndex].texts = captureTextEdits();
+                }
+            });
+
+            elem.addEventListener('blur', () => {
+                disableTextEditing(elem);
+                if (!elem.innerText.trim()) {
+                    deselectTextElem(elem);
+                    elem.remove();
+                }
+            });
+
+            return elem;
+        }
+
+        function enableTextEditing(elem, selectAll = false, clientX = null, clientY = null) {
+            if(moveMode) return;
+            deselectAllText();
+            selectTextElem(elem, true);
+            elem.contentEditable = "true";
+            elem.spellcheck = false;
+            elem.setAttribute('lang', 'hi');
+            elem.setAttribute('dir', 'ltr');
+            elem.classList.add('editing');
+            elem.focus();
+
+            const sel = window.getSelection();
+            const range = document.createRange();
+            sel.removeAllRanges();
+
+            if (selectAll) {
+                range.selectNodeContents(elem);
+            } else if (clientX !== null && clientY !== null && document.caretRangeFromPoint) {
+                const pointRange = document.caretRangeFromPoint(clientX, clientY);
+                if (pointRange && elem.contains(pointRange.startContainer)) {
+                    range.setStart(pointRange.startContainer, pointRange.startOffset);
+                    range.collapse(true);
+                } else {
+                    range.selectNodeContents(elem);
+                    range.collapse(false);
+                }
+            } else {
+                range.selectNodeContents(elem);
+                range.collapse(false);
+            }
+            sel.addRange(range);
+        }
+
+        function disableTextEditing(elem) {
+            elem.contentEditable = "false";
+            elem.classList.remove('editing');
+        }
+
+        // SINGLE CLICK SELECT & MOUSE DRAG FOR TEXT
+        function makeElementMouseDraggable(elem) {
+            let isDragging = false, startMouseX = 0, startMouseY = 0;
+            let initialPositions = [];
+            
+            elem.addEventListener('mousedown', e => {
+                if (isEraserMode || isSpacePressed || moveMode || e.button !== 0 || elem.classList.contains('editing')) return;
+                e.stopPropagation();
+                
+                if (!selectedTextElems.includes(elem)) {
+                    if (!e.shiftKey) deselectAllText();
+                    selectTextElem(elem, true);
+                }
+                
+                isDragging = true; 
+                startMouseX = e.clientX; 
+                startMouseY = e.clientY;
+
+                initialPositions = selectedTextElems.map(el => ({
+                    el,
+                    initX: parseFloat(el.dataset.canvasX) || 0,
+                    initY: parseFloat(el.dataset.canvasY) || 0
+                }));
+            });
+
+            elem.addEventListener('dblclick', e => {
+                if (isEraserMode || isSpacePressed || moveMode) return;
+                e.stopPropagation();
+                e.preventDefault();
+                enableTextEditing(elem, false, e.clientX, e.clientY);
+            });
+
+            const move = e => {
+                if (!isDragging || !masterCanvas || elem.classList.contains('editing')) return;
+                const rect = masterCanvas.getBoundingClientRect();
+                const scaleX = masterCanvas.width / rect.width;
+                const scaleY = masterCanvas.height / rect.height;
+
+                const dx = (e.clientX - startMouseX) * scaleX;
+                const dy = (e.clientY - startMouseY) * scaleY;
+
+                initialPositions.forEach(item => {
+                    const newCanvasX = Math.max(0, Math.min(masterCanvas.width - 10, item.initX + dx));
+                    const newCanvasY = Math.max(0, Math.min(masterCanvas.height - 10, item.initY + dy));
+                    updateTextElemPosition(item.el, newCanvasX, newCanvasY);
+                });
+            };
+
+            const up = () => {
+                if (isDragging) {
+                    isDragging = false;
+                    saveUndoState();
+                }
+            };
+
+            document.addEventListener('mousemove', move); 
+            document.addEventListener('mouseup', up);
+        }
+
+        // DOUBLE-CLICK DIRECT WRITE ENGINE & POSITION TRACKING
+        function initBoxSelectionEngine() {
+            const container = document.getElementById('fullScreenCanvasContainer');
+            if (!container) return;
+
+            // DOUBLE-CLICK -> EDIT EXISTING TEXT / START A NEW TEXT BOX
+            // Use event delegation here because OCR/PDF overlay layers can sit above
+            // the canvas and otherwise swallow the double-click.
+            container.ondblclick = function(e) {
+                // Double-click must always be a text action when Move is OFF.
+                // Keep this guard based on the actual Move state, not CSS.
+                if (isEraserMode || isSpacePressed) return;
+                if (moveMode) return;
+
+                e.preventDefault();
+                e.stopImmediatePropagation();
+
+                // Existing editable text: place the caret exactly where the user
+                // double-clicked instead of creating another text element.
+                const existingText = e.target.closest && e.target.closest('.seamless-text-item');
+                if (existingText && container.contains(existingText)) {
+                    enableTextEditing(existingText, false, e.clientX, e.clientY);
+                    return;
+                }
+
+                const pos = getCanvasNativeCoordinates(e.clientX, e.clientY);
+                lastClickCanvasPos = pos;
+
+                // OCR spans use pointer-events:none, so the actual target can be
+                // the OCR layer itself. Find the word under the mouse when possible.
+                let sourceText = '';
+                let sourceOpts = {};
+                const ocrLayer = e.target.closest && e.target.closest('.ocr-text-layer');
+                if (ocrLayer) {
+                    const spans = ocrLayer.querySelectorAll('span');
+                    for (const span of spans) {
+                        const r = span.getBoundingClientRect();
+                        if (e.clientX >= r.left && e.clientX <= r.right &&
+                            e.clientY >= r.top && e.clientY <= r.bottom) {
+                            sourceText = span.textContent || '';
+                            const word = span.dataset && span.dataset.wordX !== undefined;
+                            if (word) {
+                                sourceOpts.nativeFontSize = parseFloat(span.dataset.wordHeight) || 28;
+                            }
+                            break;
+                        }
+                    }
+                }
+
+                // IMPORTANT: a pending move/copy clipboard must NEVER block
+                // normal double-click text entry. Pasting is handled by Ctrl+V;
+                // double-click is always a text action when Move is OFF.
+                const elem = createSeamlessWordStyleText(
+                    pos.x, pos.y, sourceText, sourceOpts, true, false
+                );
+
+                // Always enter editing explicitly so the caret is immediately
+                // available for keyboard input.
+                if (elem) {
+                    enableTextEditing(elem, false, e.clientX, e.clientY);
+                    try { elem.focus(); } catch (_) {}
+                }
+            };
+
+            container.onmousedown = function(e) {
+                if (isEraserMode || isSpacePressed || e.button !== 0) return;
+
+                const pos = getCanvasNativeCoordinates(e.clientX, e.clientY);
+                lastClickCanvasPos = pos;
+
+                if (moveMode) return;
+                if (e.target.classList.contains('seamless-text-item') || e.target.closest('.pdf-text-layer') || e.target.closest('.ocr-text-layer')) return;
+
+                const rect = container.getBoundingClientRect();
+                boxSelectStart = {
+                    x: (e.clientX - rect.left) / currentZoom,
+                    y: (e.clientY - rect.top) / currentZoom,
+                    clientX: e.clientX,
+                    clientY: e.clientY
+                };
+                
+                isBoxSelecting = true;
+
+                if (!e.shiftKey) {
+                    deselectAllText();
+                }
+            };
+        }
+
+        window.addEventListener('mousemove', (e) => {
+            if (!isBoxSelecting || isEraserMode || isSpacePressed || moveMode) return;
+            const container = document.getElementById('fullScreenCanvasContainer');
+            if (!container) return;
+
+            const rect = container.getBoundingClientRect();
+            const currentX = (e.clientX - rect.left) / currentZoom;
+            const currentY = (e.clientY - rect.top) / currentZoom;
+
+            const dist = Math.hypot(e.clientX - boxSelectStart.clientX, e.clientY - boxSelectStart.clientY);
+
+            if (dist > 5 && !marqueeElem) {
+                marqueeElem = document.createElement('div');
+                marqueeElem.className = 'selection-marquee';
+                container.appendChild(marqueeElem);
+            }
+
+            if (marqueeElem) {
+                const x = Math.min(boxSelectStart.x, currentX);
+                const y = Math.min(boxSelectStart.y, currentY);
+                const w = Math.abs(currentX - boxSelectStart.x);
+                const h = Math.abs(currentY - boxSelectStart.y);
+
+                marqueeElem.style.left = `${x}px`;
+                marqueeElem.style.top = `${y}px`;
+                marqueeElem.style.width = `${w}px`;
+                marqueeElem.style.height = `${h}px`;
+
+                const mRect = { left: x, top: y, right: x + w, bottom: y + h };
+
+                document.querySelectorAll('.seamless-text-item').forEach(el => {
+                    const elLeft = el.offsetLeft;
+                    const elTop = el.offsetTop;
+                    const elRight = elLeft + el.offsetWidth;
+                    const elBottom = elTop + el.offsetHeight;
+
+                    const intersects = !(elLeft > mRect.right || elRight < mRect.left || elTop > mRect.bottom || elBottom < mRect.top);
+
+                    if (intersects) {
+                        selectTextElem(el, true);
+                    } else if (!e.shiftKey) {
+                        deselectTextElem(el);
+                    }
+                });
+            }
+        });
+
+        window.addEventListener('mouseup', (e) => {
+            if (isBoxSelecting) {
+                if (marqueeElem) {
+                    marqueeElem.remove();
+                    marqueeElem = null;
+                }
+                isBoxSelecting = false;
+            }
+        });
+
+        function deselectAllText() {
+            document.querySelectorAll('.seamless-text-item').forEach(el => {
+                el.classList.remove('selected');
+                disableTextEditing(el);
+            });
+            selectedTextElems = [];
+            selectedTextElem = null;
+        }
+
+        function deselectTextElem(elem) {
+            elem.classList.remove('selected');
+            disableTextEditing(elem);
+            selectedTextElems = selectedTextElems.filter(el => el !== elem);
+            selectedTextElem = selectedTextElems.length > 0 ? selectedTextElems[0] : null;
+        }
+
+        function selectTextElem(elem, append = false) {
+            if (!append) {
+                deselectAllText();
+            }
+
+            if (!selectedTextElems.includes(elem)) {
+                elem.classList.add('selected');
+                selectedTextElems.push(elem);
+            }
+            
+            selectedTextElem = elem;
+
+            const fontClass = [...elem.classList].find(c => c.startsWith('font-')) || 'font-devanagari';
+            document.getElementById('editorFontFamily').value = fontClass;
+            const nativeSize = parseFloat(elem.dataset.nativeFontSize || 28);
+            document.getElementById('fontSizeVal').innerText = `${Math.round(nativeSize)}px`;
+            document.getElementById('fontWeightVal').innerText = elem.style.fontWeight || '400';
+            
+            const blurVal = elem.dataset.blur || '0';
+            document.getElementById('textBlurRange').value = blurVal;
+            document.getElementById('textBlurVal').innerText = `${blurVal}px`;
+        }
+
+        function adjustSelectedFontSize(delta) {
+            if (selectedTextElems.length === 0) return;
+            saveUndoState();
+
+            selectedTextElems.forEach(elem => {
+                const currentNative = parseFloat(elem.dataset.nativeFontSize || 28);
+                const newNative = Math.max(8, Math.min(250, currentNative + delta));
+                elem.dataset.nativeFontSize = String(newNative);
+                
+                const currentX = parseFloat(elem.dataset.canvasX) || 0;
+                const currentY = parseFloat(elem.dataset.canvasY) || 0;
+                updateTextElemPosition(elem, currentX, currentY);
+            });
+
+            if (selectedTextElem) {
+                const nativeSize = parseFloat(selectedTextElem.dataset.nativeFontSize || 28);
+                document.getElementById('fontSizeVal').innerText = `${Math.round(nativeSize)}px`;
+            }
+        }
+
+        function adjustSelectedFontWeight(delta) {
+            if (selectedTextElems.length === 0) return;
+            saveUndoState();
+
+            selectedTextElems.forEach(elem => {
+                let current = parseInt(elem.style.fontWeight || '400', 10);
+                const next = Math.max(100, Math.min(900, current + delta));
+                elem.style.fontWeight = String(next);
+            });
+
+            if (selectedTextElem) {
+                document.getElementById('fontWeightVal').innerText = selectedTextElem.style.fontWeight || '400';
+            }
+        }
+
+        function applySelectedInkColor(color) {
+            if (selectedTextElems.length === 0) return;
+            saveUndoState();
+            selectedTextElems.forEach(elem => {
+                elem.style.color = color;
+            });
+        }
+
+        function saveUndoState() {
+            if (!masterCanvas) return;
+            const snapshot = {
+                canvasData: masterCanvas.toDataURL(),
+                texts: captureTextEdits()
+            };
+            undoStack.push(snapshot);
+            if (undoStack.length > 40) undoStack.shift();
+            redoStack = [];
+        }
+
+        function performUndo() {
+            commitActivePastedObject();
+            if (undoStack.length > 1) {
+                const currentState = undoStack.pop();
+                redoStack.push(currentState);
+                const previousState = undoStack[undoStack.length - 1];
+                restoreStateSnapshot(previousState);
+                showToast("Undo सफल");
+            }
+        }
+
+        function performRedo() {
+            commitActivePastedObject();
+            if (redoStack.length > 0) {
+                const nextState = redoStack.pop();
+                undoStack.push(nextState);
+                restoreStateSnapshot(nextState);
+                showToast("Redo सफल");
+            }
+        }
+
+        function restoreStateSnapshot(snapshot) {
+            if (!snapshot || !masterCanvas) return;
+            const img = new Image();
+            img.onload = function() {
+                masterCtx.clearRect(0, 0, masterCanvas.width, masterCanvas.height);
+                masterCtx.drawImage(img, 0, 0);
+                saveCurrentPageInMemory();
+            };
+            img.src = snapshot.canvasData;
+
+            document.querySelectorAll('.seamless-text-item').forEach(el => el.remove());
+            snapshot.texts.forEach(item => createSeamlessWordStyleText(item.canvasX, item.canvasY, item.text, item, false, false));
+        }
+
+        function applyImageFilters() {
+            const b = document.getElementById('brightnessRange').value;
+            const c = document.getElementById('contrastRange').value;
+            if (masterCanvas) masterCanvas.style.filter = `brightness(${b}%) contrast(${c}%)`;
+        }
+
+        function setEraserShape(shape) {
+            eraserShape = shape;
+            document.getElementById('eraserRectBtn').className = shape === 'rect' ? "flex-1 bg-pink-600 text-white py-1 rounded-lg text-[11px] font-bold shadow-sm" : "flex-1 bg-white text-slate-700 py-1 rounded-lg text-[11px] font-bold border border-pink-300 shadow-sm";
+            document.getElementById('eraserCircleBtn').className = shape === 'circle' ? "flex-1 bg-pink-600 text-white py-1 rounded-lg text-[11px] font-bold shadow-sm" : "flex-1 bg-white text-slate-700 py-1 rounded-lg text-[11px] font-bold border border-pink-300 shadow-sm";
+        }
+
+        function toggleEraserTool() {
+            commitActivePastedObject();
+            isEraserMode = !isEraserMode;
+            const btn = document.getElementById('eraserToggleBtn');
+            const txt = document.getElementById('eraserBtnText');
+            
+            const canvasContainer = document.getElementById('fullScreenCanvasContainer');
+
+            if (isEraserMode) {
+                deselectAllText();
+                btn.className = "w-full bg-pink-600 text-white py-1 rounded-lg text-xs font-extrabold border border-pink-600 shadow-sm";
+                txt.innerText = "रबड़ एक्टिव है";
+                if (masterCanvas) masterCanvas.classList.add('eraser-active');
+                if (canvasContainer) canvasContainer.classList.add('eraser-mode-active');
+            } else {
+                btn.className = "w-full bg-white hover:bg-pink-600 text-slate-800 hover:text-white py-1 rounded-lg text-xs font-extrabold border border-pink-300 shadow-sm";
+                txt.innerText = "रबड़ मोड चालू करें";
+                if (masterCanvas) masterCanvas.classList.remove('eraser-active');
+                if (canvasContainer) canvasContainer.classList.remove('eraser-mode-active');
+                removeEraserPreview();
+            }
+        }
+
+        function updateEraserBrushSize() {
+            eraserBrushSize = parseInt(document.getElementById('eraserSizeRange').value) || 25;
+            document.getElementById('eraserSizeVal').innerText = `${eraserBrushSize}px`;
+        }
+
+        function initDirectCanvasEraserListeners() {
+            if (!masterCanvas) return;
+            masterCanvas.onmousedown = function(e) {
+                if (!isEraserMode || isSpacePressed) return;
+                isErasing = true;
+                const pos = getCanvasNativeCoordinates(e.clientX, e.clientY);
+                eraserStart = pos;
+                removeEraserPreview();
+                eraserPreview = document.createElement('div');
+                eraserPreview.className = 'editor-eraser-preview';
+                document.getElementById('fullScreenCanvasContainer').appendChild(eraserPreview);
+                updateEraserPreviewDOM(pos);
+            };
+        }
+
+        function updateEraserPreviewDOM(pNative) {
+            if (!eraserPreview || !eraserStart || !masterCanvas) return;
+            
+            const pctStartX = (eraserStart.x / masterCanvas.width) * 100;
+            const pctStartY = (eraserStart.y / masterCanvas.height) * 100;
+            const pctPx = (pNative.x / masterCanvas.width) * 100;
+            const pctPy = (pNative.y / masterCanvas.height) * 100;
+
+            if (eraserShape === 'circle') {
+                const dx = pNative.x - eraserStart.x, dy = pNative.y - eraserStart.y;
+                const radiusNative = Math.max(eraserBrushSize / 2, Math.sqrt(dx * dx + dy * dy));
+                
+                const pctRadiusX = (radiusNative / masterCanvas.width) * 100;
+                const pctRadiusY = (radiusNative / masterCanvas.height) * 100;
+
+                eraserPreview.style.left = `${pctStartX - pctRadiusX}%`;
+                eraserPreview.style.top = `${pctStartY - pctRadiusY}%`;
+                eraserPreview.style.width = `${pctRadiusX * 2}%`;
+                eraserPreview.style.height = `${pctRadiusY * 2}%`;
+                eraserPreview.style.borderRadius = '50%';
+            } else {
+                const leftPct = Math.min(pctStartX, pctPx);
+                const topPct = Math.min(pctStartY, pctPy);
+                const widthPct = Math.max((eraserBrushSize / masterCanvas.width) * 100, Math.abs(pctPx - pctStartX));
+                const heightPct = Math.max((eraserBrushSize / masterCanvas.height) * 100, Math.abs(pctPy - pctStartY));
+
+                eraserPreview.style.left = `${leftPct}%`; 
+                eraserPreview.style.top = `${topPct}%`;
+                eraserPreview.style.width = `${widthPct}%`; 
+                eraserPreview.style.height = `${heightPct}%`;
+                eraserPreview.style.borderRadius = '0';
+            }
+        }
+
+        window.addEventListener('mousemove', (e) => {
+            if (isEraserMode && isErasing && masterCanvas) {
+                const pos = getCanvasNativeCoordinates(e.clientX, e.clientY);
+                updateEraserPreviewDOM(pos);
+            }
+        });
+
+        window.addEventListener('mouseup', (e) => {
+            if (!isEraserMode || !isErasing || !masterCanvas) return;
+            isErasing = false;
+            const pos = getCanvasNativeCoordinates(e.clientX, e.clientY);
+
+            if (eraserShape === 'circle') {
+                const dx = pos.x - eraserStart.x, dy = pos.y - eraserStart.y;
+                showPrecisionEraser(eraserStart.x, eraserStart.y, Math.max(eraserBrushSize / 2, Math.sqrt(dx * dx + dy * dy)));
+                removeEraserPreview(); eraserStart = null; return;
+            }
+
+            saveUndoState();
+            const minX = Math.min(eraserStart.x, pos.x);
+            const minY = Math.min(eraserStart.y, pos.y);
+            const w = Math.max(eraserBrushSize, Math.abs(pos.x - eraserStart.x));
+            const h = Math.max(eraserBrushSize, Math.abs(pos.y - eraserStart.y));
+
+            eraseRectSelection(minX, minY, w, h);
+            removeEraserPreview(); eraserStart = null;
+        });
+
+        function showPrecisionEraser(cx, cy, radius) {
+            removePrecisionEraser();
+            const container = document.getElementById('fullScreenCanvasContainer');
+            const box = document.createElement('div');
+            box.className = 'precision-eraser-preview';
+            
+            const pctX = ((cx - radius) / masterCanvas.width) * 100;
+            const pctY = ((cy - radius) / masterCanvas.height) * 100;
+            const pctW = ((radius * 2) / masterCanvas.width) * 100;
+            const pctH = ((radius * 2) / masterCanvas.height) * 100;
+
+            box.style.left = `${pctX}%`; box.style.top = `${pctY}%`;
+            box.style.width = `${pctW}%`; box.style.height = `${pctH}%`;
+            container.appendChild(box);
+
+            precisionEraser = { active: true, center: { x: cx, y: cy }, radius, handle: box };
+
+            let isDraggingCircle = false;
+            let startMX = 0, startMY = 0;
+            let initCX = cx, initCY = cy;
+
+            box.addEventListener('mousedown', (ev) => {
+                ev.stopPropagation();
+                isDraggingCircle = true;
+                startMX = ev.clientX;
+                startMY = ev.clientY;
+                initCX = precisionEraser.center.x;
+                initCY = precisionEraser.center.y;
+            });
+
+            const moveCircle = (me) => {
+                if (!isDraggingCircle || !masterCanvas) return;
+                const rect = masterCanvas.getBoundingClientRect();
+                const scaleX = masterCanvas.width / rect.width;
+                const scaleY = masterCanvas.height / rect.height;
+
+                const dx = (me.clientX - startMX) * scaleX;
+                const dy = (me.clientY - startMY) * scaleY;
+
+                const newCX = initCX + dx;
+                const newCY = initCY + dy;
+
+                precisionEraser.center.x = newCX;
+                precisionEraser.center.y = newCY;
+
+                const newPctX = ((newCX - radius) / masterCanvas.width) * 100;
+                const newPctY = ((newCY - radius) / masterCanvas.height) * 100;
+                box.style.left = `${newPctX}%`;
+                box.style.top = `${newPctY}%`;
+            };
+
+            const stopCircle = () => { isDraggingCircle = false; };
+            document.addEventListener('mousemove', moveCircle);
+            document.addEventListener('mouseup', stopCircle);
+        }
+
+        function removePrecisionEraser() {
+            if (precisionEraser.handle) precisionEraser.handle.remove();
+            precisionEraser = { active: false, center: null, radius: 25, handle: null };
+        }
+        
+        function erasePrecisionSelection() {
+            if (!precisionEraser.active || !masterCanvas) { alert('पहले गोल क्षेत्र सेलेक्ट करें।'); return; }
+            saveUndoState();
+            const { center, radius } = precisionEraser;
+            const eraseColor = document.getElementById('eraserColor').value || '#ffffff';
+
+            masterCtx.save(); 
+            masterCtx.fillStyle = eraseColor; 
+            masterCtx.beginPath(); 
+            masterCtx.arc(center.x, center.y, radius, 0, Math.PI * 2); 
+            masterCtx.fill(); 
+            masterCtx.restore();
+
+            document.querySelectorAll('.seamless-text-item').forEach(el => {
+                const lx = parseFloat(el.dataset.canvasX) || 0;
+                const ly = parseFloat(el.dataset.canvasY) || 0;
+                if (Math.hypot(lx - center.x, ly - center.y) <= radius) el.remove();
+            });
+            removePrecisionEraser();
+            saveCurrentPageInMemory();
+        }
+
+        function eraseRectSelection(x, y, w, h) {
+            saveUndoState();
+            const eraseColor = document.getElementById('eraserColor').value || '#ffffff';
+            masterCtx.save(); 
+            masterCtx.fillStyle = eraseColor; 
+            masterCtx.fillRect(x, y, w, h); 
+            masterCtx.restore();
+
+            document.querySelectorAll('.seamless-text-item').forEach(el => {
+                const lx = parseFloat(el.dataset.canvasX) || 0;
+                const ly = parseFloat(el.dataset.canvasY) || 0;
+                if (lx >= x && lx <= x + w && ly >= y && ly <= y + h) el.remove();
+            });
+            saveCurrentPageInMemory();
+        }
+
+        function removeEraserPreview() { if (eraserPreview) { eraserPreview.remove(); eraserPreview = null; } }
+
+        function applyZoomUI() {
+            const container = document.getElementById('fullScreenCanvasContainer');
+            const wrapper = document.getElementById('zoomOuterWrapper');
+            if (container) {
+                container.style.transform = `scale(${currentZoom})`;
+            }
+            if (wrapper && container) {
+                const baseW = container.offsetWidth || 800;
+                const baseH = container.offsetHeight || 600;
+                const scaledW = baseW * currentZoom;
+                const scaledH = baseH * currentZoom;
+
+                wrapper.style.minWidth = `${scaledW + 200}px`;
+                wrapper.style.minHeight = `${scaledH + 200}px`;
+            }
+            document.getElementById('zoomVal').innerText = `${Math.round(currentZoom * 100)}%`;
+        }
+
+        function adjustZoom(delta) {
+            currentZoom = Math.min(Math.max(0.2, currentZoom + delta), 4.0);
+            applyZoomUI();
+        }
+
+        function resetZoom() {
+            currentZoom = 1.0;
+            applyZoomUI();
+        }
+
+
+        /* MOVE MODE — ULTRA-CLEAN SEAMLESS PASTE ENGINE (NO BORDER BOX) */
+        let moveMode = false;
+        let moveSelecting = false;
+        let moveStart = null;
+        let moveRect = null;
+        let moveClipboard = null;
+        let movePastePoint = null;
+
+        // Pasted items that were locked onto the canvas remain re-selectable.
+        // Ctrl+Click on a previously pasted area reactivates it for moving.
+        let movePastedHistory = [];
+        let activePastedRecord = null;
+
+        // Active Floating Pasted Object
+        let activePastedElem = null;
+        let activePastedData = null; // { canvas, x, y, w, h }
+
+        function setMoveMode(on) {
+            moveMode = !!on;
+            const btn = document.getElementById('moveModeBtn');
+            if (btn) {
+                btn.classList.toggle('bg-emerald-600', moveMode);
+                btn.classList.toggle('bg-slate-700', !moveMode);
+                btn.innerHTML = moveMode
+                    ? '<i class="fa-solid fa-arrows-up-down-left-right"></i> Move ON'
+                    : '<i class="fa-solid fa-arrows-up-down-left-right"></i> Move';
+            }
+            const wrap = document.getElementById('fullScreenCanvasContainer');
+            if (wrap) wrap.classList.toggle('move-mode-active', moveMode);
+
+            document.body.classList.toggle('move-mode-enabled', moveMode);
+
+            if (moveMode) {
+                // Move mode is only for selecting/cutting/copying areas.
+                // Keep normal text editing completely disabled while it is ON.
+                deselectAllText();
+                if (activePastedElem) activePastedElem.style.pointerEvents = 'auto';
+                showToast("Move Mode ऑन है - एरिया सेलेक्ट करें");
+            } else {
+                // IMPORTANT: when Move is turned OFF, restore the normal editor immediately.
+                // This makes double-click text editing work again.
+                document.body.classList.remove('move-mode-enabled');
+                const wrap = document.getElementById('fullScreenCanvasContainer');
+                if (wrap) wrap.classList.remove('move-mode-active');
+
+                // Lock the current paste, but keep a re-selectable history record.
+                commitActivePastedObject();
+                if (activePastedElem) activePastedElem.style.pointerEvents = 'none';
+                clearMoveSelection();
+                movePastePoint = null;
+            }
+        }
+
+        function clearMoveSelection() {
+            const box = document.getElementById('moveSelectionBox');
+            if (box) box.remove();
+            moveRect = null;
+        }
+
+        function ensureMoveBox() {
+            let box = document.getElementById('moveSelectionBox');
+            if (box) return box;
+
+            box = document.createElement('div');
+            box.id = 'moveSelectionBox';
+            box.style.cssText = 'position:absolute;display:none;z-index:9999;border:1px dashed #2563eb;box-sizing:border-box;pointer-events:none;';
+
+            const wrap = document.getElementById('fullScreenCanvasContainer');
+            if (wrap) wrap.appendChild(box);
+            return box;
+        }
+
+        function canvasPointFromClient(clientX, clientY) {
+            if (!masterCanvas) return {x:0,y:0};
+            const r = masterCanvas.getBoundingClientRect();
+            return {
+                x: Math.max(0, Math.min(masterCanvas.width, (clientX-r.left) * masterCanvas.width/r.width)),
+                y: Math.max(0, Math.min(masterCanvas.height, (clientY-r.top) * masterCanvas.height/r.height))
+            };
+        }
+
+        function showMoveBox(rect) {
+            const box = ensureMoveBox();
+            if (!box || !masterCanvas) return;
+            const sx = masterCanvas.offsetWidth / masterCanvas.width;
+            const sy = masterCanvas.offsetHeight / masterCanvas.height;
+            box.style.display = 'block';
+            box.style.left = `${rect.x*sx}px`;
+            box.style.top = `${rect.y*sy}px`;
+            box.style.width = `${rect.w*sx}px`;
+            box.style.height = `${rect.h*sy}px`;
+        }
+
+        function normalizeMoveRect(a,b) {
+            return {x:Math.min(a.x,b.x), y:Math.min(a.y,b.y), w:Math.abs(a.x-b.x), h:Math.abs(a.y-b.y)};
+        }
+
+        function copyMoveSelection(options = {}) {
+            if (!moveRect || moveRect.w < 2 || moveRect.h < 2 || !masterCanvas) {
+                showToast("पहले माउस से एरिया सेलेक्ट करें!");
+                return false;
+            }
+
+            // Snapshot the rectangle BEFORE clearing the selection.
+            const rect = {
+                x: Math.round(moveRect.x),
+                y: Math.round(moveRect.y),
+                w: Math.max(1, Math.round(moveRect.w)),
+                h: Math.max(1, Math.round(moveRect.h))
+            };
+
+            const temp = document.createElement('canvas');
+            temp.width = rect.w;
+            temp.height = rect.h;
+            const ctx = temp.getContext('2d');
+            ctx.clearRect(0, 0, rect.w, rect.h);
+            ctx.drawImage(masterCanvas, rect.x, rect.y, rect.w, rect.h, 0, 0, rect.w, rect.h);
+
+            // Keep an independent canvas so later canvas edits cannot mutate the clipboard.
+            moveClipboard = { canvas: temp, w: rect.w, h: rect.h };
+
+            if (!options.keepSelection) clearMoveSelection();
+            showToast(options.cut ? "एरिया कट हो गया! अब Ctrl+V से पेस्ट करें" : "एरिया कॉपी हो गया! अब Ctrl+V से पेस्ट करें");
+            return true;
+        }
+
+        function cutMoveSelection() {
+            if (!moveRect || moveRect.w < 2 || moveRect.h < 2 || !masterCanvas || !masterCtx) {
+                showToast("पहले माउस से एरिया सेलेक्ट करें!");
+                return false;
+            }
+
+            // IMPORTANT: save the rectangle before copyMoveSelection() clears moveRect.
+            const rect = {
+                x: Math.round(moveRect.x),
+                y: Math.round(moveRect.y),
+                w: Math.max(1, Math.round(moveRect.w)),
+                h: Math.max(1, Math.round(moveRect.h))
+            };
+
+            // Finish any previous floating paste first.
+            if (activePastedData) commitActivePastedObject();
+
+            // Save the pre-cut state for a single clean Undo step.
+            saveUndoState();
+
+            // Copy from the original canvas, then remove the same pixels.
+            const temp = document.createElement('canvas');
+            temp.width = rect.w;
+            temp.height = rect.h;
+            const tctx = temp.getContext('2d');
+            tctx.drawImage(masterCanvas, rect.x, rect.y, rect.w, rect.h, 0, 0, rect.w, rect.h);
+            moveClipboard = { canvas: temp, w: rect.w, h: rect.h };
+
+            // Use transparency instead of painting white, so PDFs/images with non-white backgrounds
+            // keep their visual appearance when the cut region is removed.
+            masterCtx.clearRect(rect.x, rect.y, rect.w, rect.h);
+
+            saveCurrentPageInMemory();
+            clearMoveSelection();
+            showToast("एरिया कट हो गया! अब Ctrl+V से पेस्ट करें");
+            return true;
+        }
+
+        // COMMIT / LOCK FLOATING PASTED ITEM ON CANVAS, while keeping it re-selectable.
+        function commitActivePastedObject() {
+            if (!activePastedData || !masterCanvas || !masterCtx) return;
+
+            const x = Math.round(activePastedData.x);
+            const y = Math.round(activePastedData.y);
+            const w = Math.max(1, Math.round(activePastedData.w));
+            const h = Math.max(1, Math.round(activePastedData.h));
+
+            // Save the pixels underneath this pasted item so Ctrl+Click can later
+            // remove it cleanly and turn it back into a floating movable item.
+            const background = document.createElement('canvas');
+            background.width = w;
+            background.height = h;
+            background.getContext('2d').drawImage(masterCanvas, x, y, w, h, 0, 0, w, h);
+
+            // If this item was re-selected from history, replace its old history record.
+            if (activePastedRecord) {
+                const idx = movePastedHistory.indexOf(activePastedRecord);
+                if (idx !== -1) movePastedHistory.splice(idx, 1);
+            }
+
+            masterCtx.drawImage(activePastedData.canvas, x, y);
+
+            const record = {
+                canvas: activePastedData.canvas,
+                x, y, w, h,
+                background,
+                id: Date.now() + Math.random()
+            };
+            movePastedHistory.push(record);
+            activePastedRecord = null;
+
+            if (activePastedElem) {
+                activePastedElem.remove();
+                activePastedElem = null;
+            }
+            activePastedData = null;
+            saveCurrentPageInMemory();
+        }
+
+        // Ctrl+Click a previously locked pasted item to make it movable again.
+        function tryReactivatePastedAt(clientX, clientY) {
+            if (!masterCanvas || !movePastedHistory.length) return false;
+
+            const p = canvasPointFromClient(clientX, clientY);
+
+            // Search newest pasted object first, so overlapping pasted words behave naturally.
+            for (let i = movePastedHistory.length - 1; i >= 0; i--) {
+                const rec = movePastedHistory[i];
+                if (p.x < rec.x || p.y < rec.y || p.x > rec.x + rec.w || p.y > rec.y + rec.h) continue;
+
+                // If another floating item is active, finish it first.
+                if (activePastedData && activePastedRecord !== rec) {
+                    commitActivePastedObject();
+                }
+
+                // Restore the exact pixels that were underneath this pasted item.
+                // Then the pasted item becomes floating again and can be moved with
+                // mouse drag or Arrow keys.
+                masterCtx.drawImage(rec.background, rec.x, rec.y);
+                movePastedHistory.splice(i, 1);
+
+                activePastedData = {
+                    canvas: rec.canvas,
+                    x: rec.x,
+                    y: rec.y,
+                    w: rec.w,
+                    h: rec.h
+                };
+                activePastedRecord = rec;
+
+                createFloatingPastedDOM();
+                if (activePastedElem) {
+                    activePastedElem.style.pointerEvents = 'auto';
+                    activePastedElem.style.zIndex = '99999';
+                }
+
+                lastClickCanvasPos = p;
+                showToast("पेस्ट किया हुआ शब्द फिर से चुन लिया गया — Arrow या Mouse से हिलाएँ");
+                return true;
+            }
+            return false;
+        }
+
+        // PASTE FLOATING MOVEABLE OBJECT AT DESIRED POSITION
+        function pasteMoveSelectionAt(x, y) {
+            if (!moveClipboard || !masterCanvas) {
+                showToast("पहले एरिया Copy या Cut करें!");
+                return false;
+            }
+
+            // Finish the previous floating paste first. Each completed paste is
+            // treated as its own undoable action, so Ctrl+Z removes exactly one paste.
+            if (activePastedData) {
+                commitActivePastedObject();
+            }
+
+            // Save the state immediately before this paste.
+            saveUndoState();
+
+            x = Math.max(0, Math.min(masterCanvas.width - moveClipboard.w, Math.round(x)));
+            y = Math.max(0, Math.min(masterCanvas.height - moveClipboard.h, Math.round(y)));
+
+            activePastedRecord = null;
+            activePastedData = {
+                canvas: moveClipboard.canvas,
+                x: x,
+                y: y,
+                w: moveClipboard.w,
+                h: moveClipboard.h
+            };
+
+            createFloatingPastedDOM();
+            clearMoveSelection();
+
+            // Record the pasted result as a separate undo step while keeping the
+            // object floating/selectable for further positioning. We temporarily
+            // commit it, save the post-paste snapshot, then immediately reactivate it.
+            const pastedCenterX = x + (moveClipboard.w / 2);
+            const pastedCenterY = y + (moveClipboard.h / 2);
+            commitActivePastedObject();
+            saveUndoState();
+            tryReactivatePastedAt(
+                masterCanvas.getBoundingClientRect().left +
+                    (pastedCenterX / masterCanvas.width) * masterCanvas.getBoundingClientRect().width,
+                masterCanvas.getBoundingClientRect().top +
+                    (pastedCenterY / masterCanvas.height) * masterCanvas.getBoundingClientRect().height
+            );
+
+            showToast("शब्द पेस्ट हो गया! Mouse/Arrow से जगह बदलें। Ctrl+Z एक बार दबाने पर सिर्फ यही paste हटेगा।");
+            return true;
+        }
+
+        function pasteMoveSelection() {
+            // Paste only the copied/cut rectangle, not the whole page.
+            // The pasted item is kept in movePastedHistory after it is committed,
+            // so it can be selected and moved again later.
+            if (!moveClipboard) {
+                showToast("पहले एरिया Copy या Cut करें!");
+                return;
+            }
+            const p = lastClickCanvasPos || {x: 20, y: 20};
+            pasteMoveSelectionAt(p.x, p.y);
+        }
+
+        // CREATE BORDERLESS CLEAN FLOATING DOM OVERLAY FOR PASTED CONTENT
+        function createFloatingPastedDOM() {
+            if (activePastedElem) activePastedElem.remove();
+            if (!activePastedData || !masterCanvas) return;
+
+            const container = document.getElementById('fullScreenCanvasContainer');
+            const elem = document.createElement('div');
+            elem.id = 'floatingPastedElement';
+            elem.style.pointerEvents = moveMode ? 'auto' : 'none';
+
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = activePastedData.w;
+            tempCanvas.height = activePastedData.h;
+            tempCanvas.style.cssText = "width:100%; height:100%; display:block; pointer-events:none;";
+            tempCanvas.getContext('2d').drawImage(activePastedData.canvas, 0, 0);
+
+            elem.appendChild(tempCanvas);
+            container.appendChild(elem);
+            activePastedElem = elem;
+
+            updateFloatingPastedDOMPosition();
+
+            // Make floating element mouse draggable
+            let isDraggingPasted = false;
+            let startMX = 0, startMY = 0;
+            let initX = 0, initY = 0;
+
+            elem.addEventListener('mousedown', e => {
+                if (e.button !== 0) return;
+                e.stopPropagation();
+                e.preventDefault();
+                isDraggingPasted = true;
+                startMX = e.clientX;
+                startMY = e.clientY;
+                initX = activePastedData.x;
+                initY = activePastedData.y;
+            });
+
+            const onDragMove = e => {
+                if (!isDraggingPasted || !masterCanvas) return;
+                const rect = masterCanvas.getBoundingClientRect();
+                const scaleX = masterCanvas.width / rect.width;
+                const scaleY = masterCanvas.height / rect.height;
+
+                const dx = (e.clientX - startMX) * scaleX;
+                const dy = (e.clientY - startMY) * scaleY;
+
+                activePastedData.x = Math.max(0, Math.min(masterCanvas.width - activePastedData.w, initX + dx));
+                activePastedData.y = Math.max(0, Math.min(masterCanvas.height - activePastedData.h, initY + dy));
+
+                updateFloatingPastedDOMPosition();
+            };
+
+            const onDragEnd = () => {
+                isDraggingPasted = false;
+            };
+
+            document.addEventListener('mousemove', onDragMove);
+            document.addEventListener('mouseup', onDragEnd);
+        }
+
+        function updateFloatingPastedDOMPosition() {
+            if (!activePastedElem || !activePastedData || !masterCanvas) return;
+            const displayScaleX = masterCanvas.offsetWidth / masterCanvas.width;
+            const displayScaleY = masterCanvas.offsetHeight / masterCanvas.height;
+
+            activePastedElem.style.left = `${activePastedData.x * displayScaleX}px`;
+            activePastedElem.style.top = `${activePastedData.y * displayScaleY}px`;
+            activePastedElem.style.width = `${activePastedData.w * displayScaleX}px`;
+            activePastedElem.style.height = `${activePastedData.h * displayScaleY}px`;
+        }
+
+        // MOUSE DOWN HANDLER FOR CANVAS IN MOVE MODE
+        document.addEventListener('mousedown', e => {
+            if (!masterCanvas) return;
+            if (e.target.closest('aside') || e.target.closest('header') || e.target.closest('.sticky')) return;
+
+            // Re-select a previously pasted/locked item so it can be moved again.
+            // Move ON: a normal click on the pasted word reactivates it.
+            // Move OFF: Ctrl+Click reactivates it, so normal editing remains untouched.
+            if (e.button === 0 && (moveMode || e.ctrlKey)) {
+                if (tryReactivatePastedAt(e.clientX, e.clientY)) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return;
+                }
+            }
+
+            // Lock floating element if clicking anywhere outside of it
+            if (activePastedData && !e.target.closest('#floatingPastedElement') && !e.target.closest('#movePasteBtn') && !e.target.closest('#moveCopyBtn') && !e.target.closest('#moveCutBtn')) {
+                commitActivePastedObject();
+            }
+
+            if (!moveMode || !e.target.closest('#fullScreenCanvasContainer')) return;
+
+            const p = canvasPointFromClient(e.clientX, e.clientY);
+            movePastePoint = { x: p.x, y: p.y };
+
+            if (!e.target.closest('#floatingPastedElement')) {
+                moveSelecting = true;
+                moveStart = { point: p };
+                clearMoveSelection();
+            }
+        }, true);
+
+        document.addEventListener('mousemove', e => {
+            if (!moveMode || !moveStart || !masterCanvas) return;
+            const p = canvasPointFromClient(e.clientX, e.clientY);
+
+            if (moveSelecting) {
+                moveRect = normalizeMoveRect(moveStart.point, p);
+                showMoveBox(moveRect);
+            }
+        }, true);
+
+        document.addEventListener('mouseup', () => {
+            if (moveSelecting) {
+                moveSelecting = false;
+                if (!moveRect || moveRect.w < 2 || moveRect.h < 2) {
+                    clearMoveSelection();
+                }
+            }
+        }, true);
+
+        // KEYBOARD MOVEMENTS (CTRL+C, CTRL+X, CTRL+V HANDLERS)
+        // Capture in the earliest phase so the browser's native clipboard shortcuts do not
+        // swallow the Move Mode shortcuts. Text inputs/editors are deliberately left alone.
+        document.addEventListener('keydown', e => {
+            const key = String(e.key || '').toLowerCase();
+            const mod = e.ctrlKey || e.metaKey;
+
+            if (!mod) return;
+
+            const active = document.activeElement;
+            const isTyping = active && (
+                active.tagName === 'INPUT' ||
+                active.tagName === 'TEXTAREA' ||
+                active.isContentEditable ||
+                active.classList.contains('editing')
+            );
+
+            // IMPORTANT: If a Move-copy/cut item exists, Ctrl+V must paste that
+            // internal canvas item at the last double-click/canvas position.
+            // Do this BEFORE the normal typing check, otherwise the browser pastes
+            // whatever image/text is in the Windows clipboard into the contentEditable
+            // box (which is what caused the screenshot/image to appear).
+            if (key === 'v' && moveClipboard) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+
+                if (isTyping && active && active.classList.contains('editing')) {
+                    disableTextEditing(active);
+                    active.blur();
+                }
+
+                pasteMoveSelection();
+                return;
+            }
+
+            if (isTyping) return;
+
+            if (key === 'c' && moveMode) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                copyMoveSelection();
+                return;
+            }
+
+            if (key === 'x' && moveMode) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                cutMoveSelection();
+                return;
+            }
+
+        }, true);
+
+        document.addEventListener('click', e => {
+            if (e.target.closest('#moveModeBtn')) setMoveMode(!moveMode);
+            if (e.target.closest('#moveCutBtn')) cutMoveSelection();
+            if (e.target.closest('#moveCopyBtn')) copyMoveSelection();
+            if (e.target.closest('#movePasteBtn')) pasteMoveSelection();
+        });
+
+        // FINAL DOUBLE-CLICK SAFETY NET: overlay layers must never block typing.
+        document.addEventListener('dblclick', e => {
+            const container = document.getElementById('fullScreenCanvasContainer');
+            if (!container || !container.contains(e.target)) return;
+            if (isEraserMode || isSpacePressed || moveMode) return;
+
+            const existing = e.target.closest && e.target.closest('.seamless-text-item');
+            if (existing) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                enableTextEditing(existing, false, e.clientX, e.clientY);
+            }
+        }, true);
+
+        // PERFECT PRINT ENGINE (NO BLANK PAGES)
+        async function triggerCleanPrint() {
+            if (!masterCanvas || !pagesData.length) {
+                alert('प्रिंट करने के लिए पहले कोई PDF/फोटो खोलें।');
+                return;
+            }
+
+            commitActivePastedObject();
+            saveCurrentPageInMemory();
+
+            const flattenedPages = [];
+            for (let i = 0; i < pagesData.length; i++) {
+                const flattened = await getFlattenedCanvasForPage(i);
+                if (flattened) flattenedPages.push(flattened);
+            }
+
+            if (!flattenedPages.length) {
+                alert('प्रिंट तैयार नहीं हो सका।');
+                return;
+            }
+
+            const iframe = document.createElement('iframe');
+            iframe.style.position = 'fixed';
+            iframe.style.left = '-10000px';
+            iframe.style.top = '0';
+            iframe.style.width = '1px';
+            iframe.style.height = '1px';
+            iframe.style.border = '0';
+            iframe.setAttribute('aria-hidden', 'true');
+            document.body.appendChild(iframe);
+
+            const doc = iframe.contentDocument || iframe.contentWindow.document;
+            
+            let pageHtml = "";
+            flattenedPages.forEach((canvas, index) => {
+                const dataUrl = canvas.toDataURL('image/png');
+                pageHtml += `<div class="print-page"><img src="${dataUrl}" alt="Page ${index + 1}"></div>`;
+            });
+
+            doc.open();
+            doc.write(`<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<title>Print Document</title>
+<style>
+    @page { size: auto; margin: 0; }
+    html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #ffffff !important;
+        width: 100%;
+        height: 100%;
+    }
+    .print-page {
+        width: 100vw;
+        height: 100vh;
+        page-break-after: always;
+        break-after: page;
+        page-break-inside: avoid;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
+    }
+    .print-page:last-child {
+        page-break-after: avoid !important;
+        break-after: avoid !important;
+    }
+    .print-page img {
+        max-width: 100%;
+        max-height: 100%;
+        width: auto;
+        height: auto;
+        object-fit: contain;
+        display: block;
+        margin: auto;
+    }
+</style>
+</head>
+<body>${pageHtml}</body>
+</html>`);
+            doc.close();
+
+            const printNow = () => {
+                try {
+                    iframe.contentWindow.focus();
+                    iframe.contentWindow.print();
+                } finally {
+                    setTimeout(() => iframe.remove(), 2000);
+                }
+            };
+
+            const images = [...doc.images];
+            if (!images.length) {
+                iframe.remove();
+                alert('प्रिंट तैयार नहीं हो सका।');
+                return;
+            }
+
+            let remaining = images.length;
+            let failed = false;
+            const done = () => {
+                remaining--;
+                if (remaining <= 0 && !failed) setTimeout(printNow, 150);
+            };
+
+            images.forEach(img => {
+                if (img.complete && img.naturalWidth > 0) {
+                    done();
+                } else {
+                    img.onload = done;
+                    img.onerror = () => {
+                        if (!failed) {
+                            failed = true;
+                            iframe.remove();
+                            alert('प्रिंट तैयार नहीं हो सका।');
+                        }
+                    };
+                }
+            });
+        }
+
+        async function getFlattenedCanvasForPage(pageIdx) {
+            if (pageIdx === currentPageIndex) {
+                commitActivePastedObject();
+                saveCurrentPageInMemory();
+            }
+
+            const pageObj = pagesData[pageIdx];
+            if (!pageObj) return null;
+
+            if (document.fonts) await document.fonts.ready;
+
+            const realW = pageObj.baseCanvas.width;
+            const realH = pageObj.baseCanvas.height;
+
+            const outCanvas = document.createElement('canvas');
+            outCanvas.width = realW; 
+            outCanvas.height = realH;
+            const ctx = outCanvas.getContext('2d');
+
+            ctx.drawImage(pageObj.baseCanvas, 0, 0, realW, realH);
+
+            if (pageObj.texts && pageObj.texts.length > 0) {
+                pageObj.texts.forEach(item => {
+                    const nativeFontSize = item.nativeFontSize || 28;
+
+                    let fontName = "'Noto Sans Devanagari', sans-serif";
+                    if (item.fontClass === 'font-devanagari-serif') fontName = "'Noto Serif Devanagari', serif";
+                    else if (item.fontClass === 'font-handwriting') fontName = "'Kalam', cursive";
+                    else if (item.fontClass === 'font-typewriter') fontName = "'Courier Prime', monospace";
+
+                    const isBold = item.fontWeight === 'bold' || parseInt(item.fontWeight) >= 700;
+                    const isItalic = item.fontStyle === 'italic';
+
+                    ctx.save();
+                    ctx.globalAlpha = parseFloat(item.opacity) || 1.0;
+                    ctx.fillStyle = item.color || '#22252a';
+
+                    const blurVal = parseFloat(item.blur || '0');
+                    if (blurVal > 0 && ctx.filter !== undefined) {
+                        ctx.filter = `blur(${blurVal}px)`;
+                    }
+
+                    ctx.font = `${isItalic ? 'italic ' : ''}${isBold ? 'bold ' : ''}${nativeFontSize}px ${fontName}`;
+                    ctx.textBaseline = 'top';
+
+                    const lines = item.text.split('\n');
+                    const printYOffset = Math.max(2.75, nativeFontSize * 0.105);
+
+                    lines.forEach((line, lineIdx) => {
+                        ctx.fillText(
+                            line,
+                            item.canvasX,
+                            item.canvasY + printYOffset + (lineIdx * nativeFontSize * 1.15)
+                        );
+                    });
+                    ctx.restore();
+                });
+            }
+
+            return outCanvas;
+        }
+
+        async function processExport() {
+            if (!masterCanvas || pagesData.length === 0) return alert('डाउनलोड करने के लिए पहले कोई फाइल अपलोड करें!');
+            
+            commitActivePastedObject();
+            saveCurrentPageInMemory();
+
+            const format = document.getElementById('exportFormat').value;
+            const isTargetSizeOn = document.getElementById('targetSizeToggle').checked;
+
+            let targetBytes = 0;
+            if (isTargetSizeOn) {
+                const targetVal = parseFloat(document.getElementById('targetSizeValue').value) || 0;
+                const targetUnit = document.getElementById('targetSizeUnit').value;
+                targetBytes = targetVal;
+                if (targetUnit === 'KB') targetBytes *= 1024;
+                if (targetUnit === 'MB') targetBytes *= 1024 * 1024;
+            }
+
+            let exportFilename = `${loadedOriginalFileName}_edited.${format}`;
+
+            if (format === 'txt') {
+                let fullText = "";
+                pagesData.forEach((p, idx) => {
+                    fullText += `--- Page ${idx + 1} ---\n`;
+                    (p.texts || []).forEach(t => { fullText += t.text + '\n'; });
+                });
+                const blob = new Blob([fullText || "No Text"], { type: 'text/plain' });
+                const finalBlob = isTargetSizeOn ? padBlobToTargetSize(blob, targetBytes) : blob;
+                triggerDownload(finalBlob, `${loadedOriginalFileName}_edited.txt`);
+                return;
+            }
+
+            if (format === 'jpg' || format === 'png') {
+                const canvas = await getFlattenedCanvasForPage(currentPageIndex);
+                const mime = format === 'jpg' ? 'image/jpeg' : 'image/png';
+                const dataUrl = canvas.toDataURL(mime, 0.95);
+                const res = await fetch(dataUrl);
+                let imageBlob = await res.blob();
+
+                const finalBlob = isTargetSizeOn ? padBlobToTargetSize(imageBlob, targetBytes) : imageBlob;
+                triggerDownload(finalBlob, exportFilename);
+                return;
+            }
+
+            if (format === 'pdf') {
+                const { jsPDF } = window.jspdf;
+                let pdf = null;
+
+                for (let i = 0; i < pagesData.length; i++) {
+                    const canvas = await getFlattenedCanvasForPage(i);
+                    if (i === 0) {
+                        pdf = new jsPDF('p', 'pt', [canvas.width, canvas.height]);
+                    } else {
+                        pdf.addPage([canvas.width, canvas.height], canvas.width > canvas.height ? 'l' : 'p');
+                    }
+                    pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, canvas.width, canvas.height);
+                }
+                
+                const pdfBlob = pdf.output('blob');
+                const finalBlob = isTargetSizeOn ? padBlobToTargetSize(pdfBlob, targetBytes) : pdfBlob;
+                triggerDownload(finalBlob, exportFilename);
+            }
+        }
+
+        function triggerDownload(blob, filename) {
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            link.click();
+            URL.revokeObjectURL(link.href);
+        }
+
+        function padBlobToTargetSize(originalBlob, targetBytes) {
+            if (originalBlob.size >= targetBytes) return originalBlob;
+            const paddingSize = targetBytes - originalBlob.size;
+            const paddingChunk = new Uint8Array(1024 * 1024);
+            const chunks = [originalBlob];
+
+            let remaining = paddingSize;
+            while (remaining > 0) {
+                const currentChunkSize = Math.min(remaining, paddingChunk.length);
+                chunks.push(paddingChunk.subarray(0, currentChunkSize));
+                remaining -= currentChunkSize;
+            }
+            return new Blob(chunks, { type: originalBlob.type });
+        }
+
+        function startStraightenTool() {
+            if (!masterCanvas) return alert('पहले कोई PDF/फोटो अपलोड करें');
+            commitActivePastedObject();
+            cancelStraightenTool();
+
+            const c = document.getElementById('fullScreenCanvasContainer');
+            const overlay = document.createElement('div');
+            overlay.className = 'straighten-overlay';
+            c.appendChild(overlay);
+
+            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.setAttribute('class', 'straighten-svg-layer');
+            const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+            polygon.setAttribute('fill', 'rgba(14, 165, 233, 0.15)');
+            polygon.setAttribute('stroke', '#0284c7');
+            polygon.setAttribute('stroke-width', '2');
+            polygon.setAttribute('stroke-dasharray', '4 4');
+            svg.appendChild(polygon);
+            overlay.appendChild(svg);
+
+            const W = c.offsetWidth, H = c.offsetHeight;
+            const pts = [ { x: 20, y: 20 }, { x: W - 20, y: 20 }, { x: W - 20, y: H - 20 }, { x: 20, y: H - 20 } ];
+
+            function updateLines() {
+                polygon.setAttribute('points', pts.map(p => `${p.x},${p.y}`).join(' '));
+            }
+
+            pts.forEach((p) => {
+                const handle = document.createElement('div');
+                handle.className = 'straighten-point';
+                handle.style.left = `${p.x}px`; handle.style.top = `${p.y}px`;
+
+                handle.addEventListener('mousedown', (ev) => {
+                    ev.preventDefault(); ev.stopPropagation();
+
+                    const move = (me) => {
+                        const pos = getCanvasNativeCoordinates(me.clientX, me.clientY);
+                        const displayScale = W / masterCanvas.width;
+                        
+                        p.x = pos.x * displayScale;
+                        p.y = pos.y * displayScale;
+
+                        handle.style.left = `${p.x}px`; handle.style.top = `${p.y}px`;
+                        updateLines();
+                    };
+
+                    const up = () => {
+                        document.removeEventListener('mousemove', move);
+                        document.removeEventListener('mouseup', up);
+                    };
+
+                    document.addEventListener('mousemove', move);
+                    document.addEventListener('mouseup', up);
+                });
+
+                overlay.appendChild(handle);
+            });
+
+            updateLines();
+            straightenState = { overlay, points: pts };
+            document.getElementById('straightenControls').classList.remove('hidden');
+            document.getElementById('straightenBtn').classList.add('hidden');
+        }
+
+        function cancelStraightenTool() {
+            if (straightenState?.overlay) straightenState.overlay.remove();
+            straightenState = null;
+            document.getElementById('straightenControls')?.classList.add('hidden');
+            document.getElementById('straightenBtn')?.classList.remove('hidden');
+        }
+
+        function applyStraightenTool() {
+            if (!straightenState || !masterCanvas) return;
+            const pts = straightenState.points;
+            const c = document.getElementById('fullScreenCanvasContainer');
+            const sx = masterCanvas.width / c.offsetWidth;
+            const sy = masterCanvas.height / c.offsetHeight;
+
+            const W = Math.max(10, Math.round(Math.max(
+                Math.hypot((pts[1].x - pts[0].x) * sx, (pts[1].y - pts[0].y) * sy),
+                Math.hypot((pts[2].x - pts[3].x) * sx, (pts[2].y - pts[3].y) * sy)
+            )));
+
+            const H = Math.max(10, Math.round(Math.max(
+                Math.hypot((pts[3].x - pts[0].x) * sx, (pts[3].y - pts[0].y) * sy),
+                Math.hypot((pts[2].x - pts[1].x) * sx, (pts[2].y - pts[1].y) * sy)
+            )));
+
+            const src = masterCtx.getImageData(0, 0, masterCanvas.width, masterCanvas.height);
+            const out = document.createElement('canvas');
+            out.width = W; out.height = H;
+            const od = out.getContext('2d').createImageData(W, H);
+            const d = src.data;
+
+            for (let y = 0; y < H; y++) {
+                const v = y / (H - 1 || 1);
+                for (let x = 0; x < W; x++) {
+                    const u = x / (W - 1 || 1);
+                    const tx = pts[0].x + (pts[1].x - pts[0].x) * u;
+                    const ty = pts[0].y + (pts[1].y - pts[0].y) * u;
+                    const bx = pts[3].x + (pts[2].x - pts[3].x) * u;
+                    const by = pts[3].y + (pts[2].y - pts[3].y) * u;
+
+                    const ix = Math.max(0, Math.min(masterCanvas.width - 1, Math.round((tx + (bx - tx) * v) * sx)));
+                    const iy = Math.max(0, Math.min(masterCanvas.height - 1, Math.round((ty + (by - ty) * v) * sy)));
+
+                    const si = (iy * masterCanvas.width + ix) * 4;
+                    const di = (y * W + x) * 4;
+
+                    od.data[di] = d[si]; od.data[di + 1] = d[si + 1]; od.data[di + 2] = d[si + 2]; od.data[di + 3] = d[si + 3];
+                }
+            }
+
+            out.getContext('2d').putImageData(od, 0, 0);
+            saveUndoState();
+            pagesData[currentPageIndex].baseCanvas = out;
+            cancelStraightenTool();
+            renderPageInEditor(currentPageIndex);
+        }
+    </script>
+</body>
+</html>
