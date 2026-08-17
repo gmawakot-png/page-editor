@@ -272,7 +272,7 @@
             position: absolute;
             z-index: 9998;
             cursor: move;
-            border: none !important; /* बीना किसी बॉक्स/बॉर्डर के बिल्कुल क्लीन */
+            border: none !important;
             box-shadow: none !important;
             outline: none !important;
             user-select: none;
@@ -281,8 +281,6 @@
             background: transparent;
         }
 
-        /* Text editing is disabled ONLY while Move Mode is ON.
-           When Move is OFF, double-click works normally again. */
         body.move-mode-enabled .seamless-text-item {
             pointer-events: none !important;
             user-select: none !important;
@@ -641,11 +639,9 @@
                 e.preventDefault();
                 e.stopPropagation();
 
-                // If internal copied image exists, paste it!
                 if (moveMode && moveClipboard) {
                     pasteMoveSelectionAt(lastClickCanvasPos.x, lastClickCanvasPos.y);
                 } else {
-                    // Check external clipboard images
                     const items = (e.clipboardData || window.clipboardData)?.items;
                     if (items) {
                         for (let item of items) {
@@ -693,7 +689,6 @@
                 active.classList.contains('editing')
             );
 
-            // GLOBAL KEYBOARD SHORTCUTS
             if (e.ctrlKey || e.metaKey) {
                 const key = e.key.toLowerCase();
 
@@ -733,7 +728,6 @@
 
             const isArrow = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key);
 
-            // FLOATING PASTED ITEM MOVEMENT (Works everywhere, even if Move Mode is OFF)
             if (activePastedData && isArrow) {
                 e.preventDefault();
                 e.stopPropagation();
@@ -758,7 +752,6 @@
                 return;
             }
 
-            // ACCURATE ARROW KEY MOVEMENT FOR SELECTED TEXT
             if (!moveMode && selectedTextElems.length > 0 && isArrow) {
                 e.preventDefault();
                 const nudgeStep = e.shiftKey ? 1 : 0.25;
@@ -980,18 +973,7 @@
         async function runImageOCR(canvas) {
             if (typeof Tesseract === 'undefined') return [];
             try {
-                const result = await Tesseract.recognize(canvas, 'hin+eng', {
-                    logger: m => {
-                        if (m && m.status === 'recognizing text' && typeof m.progress === 'number') {
-                            const toast = document.getElementById('toastNotification');
-                            const msg = document.getElementById('toastText');
-                            if (toast && msg) {
-                                msg.innerText = `इमेज का टेक्स्ट पढ़ा जा रहा है... ${Math.round(m.progress * 100)}%`;
-                                toast.style.display = 'flex';
-                            }
-                        }
-                    }
-                });
+                const result = await Tesseract.recognize(canvas, 'hin+eng');
                 return (result.data?.words || []).filter(w => w?.text?.trim() && w.bbox).map(w => ({
                     text: w.text, x: Number(w.bbox.x0) || 0, y: Number(w.bbox.y0) || 0,
                     width: Math.max(2, (Number(w.bbox.x1) || 0) - (Number(w.bbox.x0) || 0)),
@@ -1003,20 +985,14 @@
             }
         }
 
-        // UNIVERSAL FILE UPLOAD HANDLING
+        /* -------------------------------------------------------------
+           SUPER FAST INSTANT (0-SECOND) FILE UPLOAD ENGINE
+        ------------------------------------------------------------- */
         async function handleUniversalUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
 
             if (typeof setMoveMode === 'function') setMoveMode(false);
-
-            const container = document.getElementById('fullScreenCanvasContainer');
-            container.innerHTML = `
-                <div class="p-12 text-center text-indigo-400">
-                    <i class="fa-solid fa-spinner fa-spin text-4xl mb-3 text-indigo-500 block"></i>
-                    <p class="font-extrabold text-sm text-slate-700">फाइल लोड हो रही है...</p>
-                </div>
-            `;
 
             let sizeFormatted = (file.size / 1024).toFixed(1) + " KB";
             if (file.size > 1024 * 1024) sizeFormatted = (file.size / (1024 * 1024)).toFixed(2) + " MB";
@@ -1037,8 +1013,9 @@
                     const arrayBuffer = await file.arrayBuffer();
                     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
                     
-                    for (let p = 1; p <= pdf.numPages; p++) {
-                        const page = await pdf.getPage(p);
+                    // Helper function to render a single PDF page
+                    async function fetchPdfPageData(pNum) {
+                        const page = await pdf.getPage(pNum);
                         const viewport = page.getViewport({ scale: 2 });
 
                         const canvas = document.createElement('canvas');
@@ -1061,47 +1038,71 @@
                             };
                         });
 
-                        pagesData.push({
+                        return {
                             baseCanvas: cloneCanvas(canvas),
                             rawCanvas: cloneCanvas(canvas),
                             pdfTextItems: pdfTextItems,
                             ocrWords: [],
                             texts: []
-                        });
+                        };
                     }
 
-                } else if (file.type.startsWith('image/')) {
-                    await new Promise((resolve) => {
-                        const reader = new FileReader();
-                        reader.onload = function(e) {
-                            const img = new Image();
-                            img.onload = function() {
-                                const canvas = document.createElement('canvas');
-                                canvas.width = img.width;
-                                canvas.height = img.height;
-                                canvas.getContext('2d').drawImage(img, 0, 0);
-                                (async () => {
-                                    const ocrWords = await runImageOCR(canvas);
-                                    pagesData.push({
-                                        baseCanvas: cloneCanvas(canvas),
-                                        rawCanvas: cloneCanvas(canvas),
-                                        pdfTextItems: [],
-                                        ocrWords,
-                                        texts: []
-                                    });
-                                    resolve();
-                                })();
-                            };
-                            img.src = e.target.result;
-                        };
-                        reader.readAsDataURL(file);
-                    });
-                }
+                    // 1. Process Page 1 and display INSTANTLY
+                    const page1Data = await fetchPdfPageData(1);
+                    pagesData.push(page1Data);
 
-                if (pagesData.length > 0) {
                     updateMultiPageControlsUI();
                     renderPageInEditor(0);
                     resetZoom();
+
+                    // 2. Load remaining pages in the background asynchronously
+                    if (pdf.numPages > 1) {
+                        (async () => {
+                            for (let p = 2; p <= pdf.numPages; p++) {
+                                const pData = await fetchPdfPageData(p);
+                                pagesData.push(pData);
+                                updateMultiPageControlsUI();
+                            }
+                        })();
+                    }
+
+                } else if (file.type.startsWith('image/')) {
+                    // FAST ZERO-DELAY IMAGE LOADING WITH BLOB URL
+                    const objectUrl = URL.createObjectURL(file);
+                    const img = new Image();
+                    
+                    img.onload = function() {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        canvas.getContext('2d').drawImage(img, 0, 0);
+                        URL.revokeObjectURL(objectUrl);
+
+                        const pageObj = {
+                            baseCanvas: cloneCanvas(canvas),
+                            rawCanvas: cloneCanvas(canvas),
+                            pdfTextItems: [],
+                            ocrWords: [],
+                            texts: []
+                        };
+
+                        pagesData.push(pageObj);
+
+                        // DISPLAY IMAGE IMMEDIATELY (0 SECONDS DELAY)
+                        updateMultiPageControlsUI();
+                        renderPageInEditor(0);
+                        resetZoom();
+
+                        // Run OCR in background without slowing down display
+                        runImageOCR(canvas).then(ocrWords => {
+                            pageObj.ocrWords = ocrWords;
+                            if (currentPageIndex === 0 && ocrWords.length > 0) {
+                                // quietly append OCR text layer if user is still on page 0
+                                renderPageInEditor(0);
+                            }
+                        });
+                    };
+                    img.src = objectUrl;
                 }
             } catch (err) {
                 alert('फाइल रेंडर करने में समस्या: ' + err.message);
@@ -1373,7 +1374,6 @@
             elem.classList.remove('editing');
         }
 
-        // SINGLE CLICK SELECT & MOUSE DRAG FOR TEXT
         function makeElementMouseDraggable(elem) {
             let isDragging = false, startMouseX = 0, startMouseY = 0;
             let initialPositions = [];
@@ -1432,25 +1432,17 @@
             document.addEventListener('mouseup', up);
         }
 
-        // DOUBLE-CLICK DIRECT WRITE ENGINE & POSITION TRACKING
         function initBoxSelectionEngine() {
             const container = document.getElementById('fullScreenCanvasContainer');
             if (!container) return;
 
-            // DOUBLE-CLICK -> EDIT EXISTING TEXT / START A NEW TEXT BOX
-            // Use event delegation here because OCR/PDF overlay layers can sit above
-            // the canvas and otherwise swallow the double-click.
             container.ondblclick = function(e) {
-                // Double-click must always be a text action when Move is OFF.
-                // Keep this guard based on the actual Move state, not CSS.
                 if (isEraserMode || isSpacePressed) return;
                 if (moveMode) return;
 
                 e.preventDefault();
                 e.stopImmediatePropagation();
 
-                // Existing editable text: place the caret exactly where the user
-                // double-clicked instead of creating another text element.
                 const existingText = e.target.closest && e.target.closest('.seamless-text-item');
                 if (existingText && container.contains(existingText)) {
                     enableTextEditing(existingText, false, e.clientX, e.clientY);
@@ -1460,8 +1452,6 @@
                 const pos = getCanvasNativeCoordinates(e.clientX, e.clientY);
                 lastClickCanvasPos = pos;
 
-                // OCR spans use pointer-events:none, so the actual target can be
-                // the OCR layer itself. Find the word under the mouse when possible.
                 let sourceText = '';
                 let sourceOpts = {};
                 const ocrLayer = e.target.closest && e.target.closest('.ocr-text-layer');
@@ -1481,15 +1471,10 @@
                     }
                 }
 
-                // IMPORTANT: a pending move/copy clipboard must NEVER block
-                // normal double-click text entry. Pasting is handled by Ctrl+V;
-                // double-click is always a text action when Move is OFF.
                 const elem = createSeamlessWordStyleText(
                     pos.x, pos.y, sourceText, sourceOpts, true, false
                 );
 
-                // Always enter editing explicitly so the caret is immediately
-                // available for keyboard input.
                 if (elem) {
                     enableTextEditing(elem, false, e.clientX, e.clientY);
                     try { elem.focus(); } catch (_) {}
@@ -1952,8 +1937,7 @@
             applyZoomUI();
         }
 
-
-        /* MOVE MODE — ULTRA-CLEAN SEAMLESS PASTE ENGINE (NO BORDER BOX) */
+        /* MOVE MODE — ULTRA-CLEAN SEAMLESS PASTE ENGINE */
         let moveMode = false;
         let moveSelecting = false;
         let moveStart = null;
@@ -1961,14 +1945,11 @@
         let moveClipboard = null;
         let movePastePoint = null;
 
-        // Pasted items that were locked onto the canvas remain re-selectable.
-        // Ctrl+Click on a previously pasted area reactivates it for moving.
         let movePastedHistory = [];
         let activePastedRecord = null;
 
-        // Active Floating Pasted Object
         let activePastedElem = null;
-        let activePastedData = null; // { canvas, x, y, w, h }
+        let activePastedData = null;
 
         function setMoveMode(on) {
             moveMode = !!on;
@@ -1986,19 +1967,14 @@
             document.body.classList.toggle('move-mode-enabled', moveMode);
 
             if (moveMode) {
-                // Move mode is only for selecting/cutting/copying areas.
-                // Keep normal text editing completely disabled while it is ON.
                 deselectAllText();
                 if (activePastedElem) activePastedElem.style.pointerEvents = 'auto';
                 showToast("Move Mode ऑन है - एरिया सेलेक्ट करें");
             } else {
-                // IMPORTANT: when Move is turned OFF, restore the normal editor immediately.
-                // This makes double-click text editing work again.
                 document.body.classList.remove('move-mode-enabled');
                 const wrap = document.getElementById('fullScreenCanvasContainer');
                 if (wrap) wrap.classList.remove('move-mode-active');
 
-                // Lock the current paste, but keep a re-selectable history record.
                 commitActivePastedObject();
                 if (activePastedElem) activePastedElem.style.pointerEvents = 'none';
                 clearMoveSelection();
@@ -2056,7 +2032,6 @@
                 return false;
             }
 
-            // Snapshot the rectangle BEFORE clearing the selection.
             const rect = {
                 x: Math.round(moveRect.x),
                 y: Math.round(moveRect.y),
@@ -2071,7 +2046,6 @@
             ctx.clearRect(0, 0, rect.w, rect.h);
             ctx.drawImage(masterCanvas, rect.x, rect.y, rect.w, rect.h, 0, 0, rect.w, rect.h);
 
-            // Keep an independent canvas so later canvas edits cannot mutate the clipboard.
             moveClipboard = { canvas: temp, w: rect.w, h: rect.h };
 
             if (!options.keepSelection) clearMoveSelection();
@@ -2085,7 +2059,6 @@
                 return false;
             }
 
-            // IMPORTANT: save the rectangle before copyMoveSelection() clears moveRect.
             const rect = {
                 x: Math.round(moveRect.x),
                 y: Math.round(moveRect.y),
@@ -2093,13 +2066,10 @@
                 h: Math.max(1, Math.round(moveRect.h))
             };
 
-            // Finish any previous floating paste first.
             if (activePastedData) commitActivePastedObject();
 
-            // Save the pre-cut state for a single clean Undo step.
             saveUndoState();
 
-            // Copy from the original canvas, then remove the same pixels.
             const temp = document.createElement('canvas');
             temp.width = rect.w;
             temp.height = rect.h;
@@ -2107,8 +2077,6 @@
             tctx.drawImage(masterCanvas, rect.x, rect.y, rect.w, rect.h, 0, 0, rect.w, rect.h);
             moveClipboard = { canvas: temp, w: rect.w, h: rect.h };
 
-            // Use transparency instead of painting white, so PDFs/images with non-white backgrounds
-            // keep their visual appearance when the cut region is removed.
             masterCtx.clearRect(rect.x, rect.y, rect.w, rect.h);
 
             saveCurrentPageInMemory();
@@ -2117,7 +2085,6 @@
             return true;
         }
 
-        // COMMIT / LOCK FLOATING PASTED ITEM ON CANVAS, while keeping it re-selectable.
         function commitActivePastedObject() {
             if (!activePastedData || !masterCanvas || !masterCtx) return;
 
@@ -2126,14 +2093,11 @@
             const w = Math.max(1, Math.round(activePastedData.w));
             const h = Math.max(1, Math.round(activePastedData.h));
 
-            // Save the pixels underneath this pasted item so Ctrl+Click can later
-            // remove it cleanly and turn it back into a floating movable item.
             const background = document.createElement('canvas');
             background.width = w;
             background.height = h;
             background.getContext('2d').drawImage(masterCanvas, x, y, w, h, 0, 0, w, h);
 
-            // If this item was re-selected from history, replace its old history record.
             if (activePastedRecord) {
                 const idx = movePastedHistory.indexOf(activePastedRecord);
                 if (idx !== -1) movePastedHistory.splice(idx, 1);
@@ -2158,25 +2122,19 @@
             saveCurrentPageInMemory();
         }
 
-        // Ctrl+Click a previously locked pasted item to make it movable again.
         function tryReactivatePastedAt(clientX, clientY) {
             if (!masterCanvas || !movePastedHistory.length) return false;
 
             const p = canvasPointFromClient(clientX, clientY);
 
-            // Search newest pasted object first, so overlapping pasted words behave naturally.
             for (let i = movePastedHistory.length - 1; i >= 0; i--) {
                 const rec = movePastedHistory[i];
                 if (p.x < rec.x || p.y < rec.y || p.x > rec.x + rec.w || p.y > rec.y + rec.h) continue;
 
-                // If another floating item is active, finish it first.
                 if (activePastedData && activePastedRecord !== rec) {
                     commitActivePastedObject();
                 }
 
-                // Restore the exact pixels that were underneath this pasted item.
-                // Then the pasted item becomes floating again and can be moved with
-                // mouse drag or Arrow keys.
                 masterCtx.drawImage(rec.background, rec.x, rec.y);
                 movePastedHistory.splice(i, 1);
 
@@ -2202,20 +2160,16 @@
             return false;
         }
 
-        // PASTE FLOATING MOVEABLE OBJECT AT DESIRED POSITION
         function pasteMoveSelectionAt(x, y) {
             if (!moveClipboard || !masterCanvas) {
                 showToast("पहले एरिया Copy या Cut करें!");
                 return false;
             }
 
-            // Finish the previous floating paste first. Each completed paste is
-            // treated as its own undoable action, so Ctrl+Z removes exactly one paste.
             if (activePastedData) {
                 commitActivePastedObject();
             }
 
-            // Save the state immediately before this paste.
             saveUndoState();
 
             x = Math.max(0, Math.min(masterCanvas.width - moveClipboard.w, Math.round(x)));
@@ -2233,9 +2187,6 @@
             createFloatingPastedDOM();
             clearMoveSelection();
 
-            // Record the pasted result as a separate undo step while keeping the
-            // object floating/selectable for further positioning. We temporarily
-            // commit it, save the post-paste snapshot, then immediately reactivate it.
             const pastedCenterX = x + (moveClipboard.w / 2);
             const pastedCenterY = y + (moveClipboard.h / 2);
             commitActivePastedObject();
@@ -2252,9 +2203,6 @@
         }
 
         function pasteMoveSelection() {
-            // Paste only the copied/cut rectangle, not the whole page.
-            // The pasted item is kept in movePastedHistory after it is committed,
-            // so it can be selected and moved again later.
             if (!moveClipboard) {
                 showToast("पहले एरिया Copy या Cut करें!");
                 return;
@@ -2263,7 +2211,6 @@
             pasteMoveSelectionAt(p.x, p.y);
         }
 
-        // CREATE BORDERLESS CLEAN FLOATING DOM OVERLAY FOR PASTED CONTENT
         function createFloatingPastedDOM() {
             if (activePastedElem) activePastedElem.remove();
             if (!activePastedData || !masterCanvas) return;
@@ -2285,7 +2232,6 @@
 
             updateFloatingPastedDOMPosition();
 
-            // Make floating element mouse draggable
             let isDraggingPasted = false;
             let startMX = 0, startMY = 0;
             let initX = 0, initY = 0;
@@ -2335,14 +2281,10 @@
             activePastedElem.style.height = `${activePastedData.h * displayScaleY}px`;
         }
 
-        // MOUSE DOWN HANDLER FOR CANVAS IN MOVE MODE
         document.addEventListener('mousedown', e => {
             if (!masterCanvas) return;
             if (e.target.closest('aside') || e.target.closest('header') || e.target.closest('.sticky')) return;
 
-            // Re-select a previously pasted/locked item so it can be moved again.
-            // Move ON: a normal click on the pasted word reactivates it.
-            // Move OFF: Ctrl+Click reactivates it, so normal editing remains untouched.
             if (e.button === 0 && (moveMode || e.ctrlKey)) {
                 if (tryReactivatePastedAt(e.clientX, e.clientY)) {
                     e.preventDefault();
@@ -2351,7 +2293,6 @@
                 }
             }
 
-            // Lock floating element if clicking anywhere outside of it
             if (activePastedData && !e.target.closest('#floatingPastedElement') && !e.target.closest('#movePasteBtn') && !e.target.closest('#moveCopyBtn') && !e.target.closest('#moveCutBtn')) {
                 commitActivePastedObject();
             }
@@ -2387,9 +2328,6 @@
             }
         }, true);
 
-        // KEYBOARD MOVEMENTS (CTRL+C, CTRL+X, CTRL+V HANDLERS)
-        // Capture in the earliest phase so the browser's native clipboard shortcuts do not
-        // swallow the Move Mode shortcuts. Text inputs/editors are deliberately left alone.
         document.addEventListener('keydown', e => {
             const key = String(e.key || '').toLowerCase();
             const mod = e.ctrlKey || e.metaKey;
@@ -2404,11 +2342,6 @@
                 active.classList.contains('editing')
             );
 
-            // IMPORTANT: If a Move-copy/cut item exists, Ctrl+V must paste that
-            // internal canvas item at the last double-click/canvas position.
-            // Do this BEFORE the normal typing check, otherwise the browser pastes
-            // whatever image/text is in the Windows clipboard into the contentEditable
-            // box (which is what caused the screenshot/image to appear).
             if (key === 'v' && moveClipboard) {
                 e.preventDefault();
                 e.stopImmediatePropagation();
@@ -2447,7 +2380,6 @@
             if (e.target.closest('#movePasteBtn')) pasteMoveSelection();
         });
 
-        // FINAL DOUBLE-CLICK SAFETY NET: overlay layers must never block typing.
         document.addEventListener('dblclick', e => {
             const container = document.getElementById('fullScreenCanvasContainer');
             if (!container || !container.contains(e.target)) return;
@@ -2461,7 +2393,6 @@
             }
         }, true);
 
-        // PERFECT PRINT ENGINE (NO BLANK PAGES)
         async function triggerCleanPrint() {
             if (!masterCanvas || !pagesData.length) {
                 alert('प्रिंट करने के लिए पहले कोई PDF/फोटो खोलें।');
