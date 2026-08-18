@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Page Editor</title>
+    <title>Page Editor - Multi-File & Color Mixer</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -173,7 +173,7 @@
             z-index: 99999 !important; 
             pointer-events: none !important; 
             box-sizing: border-box;
-            background: rgba(236, 72, 153, 0.35); 
+            background: rgba(236, 72, 153, 0.25); 
             border: 2px dashed rgba(219, 39, 119, 1); 
         }
 
@@ -267,7 +267,6 @@
             box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.8);
         }
 
-        /* CLEAN FLOATING PASTED ELEMENT STYLE - NO BORDER/BOX */
         #floatingPastedElement {
             position: absolute;
             z-index: 9998;
@@ -302,8 +301,8 @@
                 <i class="fa-solid fa-layer-group text-sm"></i>
             </div>
             <div>
-                <h1 class="text-sm font-extrabold text-slate-900 leading-tight">G Bisht</h1>
-                <p class="text-[10px] font-semibold text-slate-500">page editor</p>
+                <h1 class="text-sm font-extrabold text-slate-900 leading-tight">G Bisht Pro</h1>
+                <p class="text-[10px] font-semibold text-slate-500">Page Editor & Color Mixer</p>
             </div>
         </div>
 
@@ -333,19 +332,20 @@
     <main class="flex-1 flex overflow-hidden">
 
         <!-- DASHBOARD SIDEBAR -->
-        <aside class="w-[280px] bg-slate-50 border-r border-slate-200 p-2.5 flex flex-col gap-2 overflow-y-auto shrink-0 shadow-sm h-full">
+        <aside class="w-[285px] bg-slate-50 border-r border-slate-200 p-2.5 flex flex-col gap-2 overflow-y-auto shrink-0 shadow-sm h-full">
             
-            <!-- UPLOADER -->
+            <!-- UPLOADER (MULTI FILE SUPPORT) -->
             <div class="bg-white border border-slate-200 rounded-xl p-2.5 shadow-sm">
                 <div class="flex items-center justify-between mb-1.5">
-                    <span class="text-xs font-extrabold text-slate-800 uppercase"><i class="fa-solid fa-file-pdf text-red-500 mr-1"></i> फाइल लोड करें</span>
-                    <span class="text-[10px] text-slate-400 font-bold">PDF, JPG, PNG</span>
+                    <span class="text-xs font-extrabold text-slate-800 uppercase"><i class="fa-solid fa-copy text-indigo-500 mr-1"></i> बहु-फ़ाइल अपलोड (Multiple)</span>
+                    <span class="text-[9px] bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded font-extrabold">PDF / Images</span>
                 </div>
 
-                <div class="border border-dashed border-slate-300 hover:border-indigo-500 rounded-xl p-2 text-center bg-slate-50 cursor-pointer transition" onclick="document.getElementById('universalFileInput').click()">
-                    <i class="fa-solid fa-cloud-arrow-up text-base text-slate-400 mb-0.5"></i>
-                    <p class="text-[11px] font-bold text-slate-700">फाइल अपलोड करने हेतु क्लिक करें</p>
-                    <input type="file" id="universalFileInput" accept="application/pdf,image/*" class="hidden" onchange="handleUniversalUpload(event); this.value=''">
+                <div class="border border-dashed border-indigo-300 hover:border-indigo-600 rounded-xl p-2.5 text-center bg-indigo-50/30 cursor-pointer transition" onclick="document.getElementById('universalFileInput').click()">
+                    <i class="fa-solid fa-folder-open text-lg text-indigo-500 mb-0.5"></i>
+                    <p class="text-[11px] font-extrabold text-indigo-900">एक या अधिक फ़ाइलें चुनें</p>
+                    <p class="text-[9px] font-bold text-slate-500">Ctrl/Shift दबाकर कई फ़ाइलें चुनें</p>
+                    <input type="file" id="universalFileInput" accept="application/pdf,image/*" multiple class="hidden" onchange="handleUniversalUpload(event); this.value=''">
                 </div>
 
                 <div id="loadedFileInfo" class="hidden mt-2 bg-indigo-50 border border-indigo-100 p-1.5 rounded-lg flex items-center justify-between text-xs text-indigo-900 font-bold">
@@ -435,9 +435,12 @@
                 </div>
             </div>
 
-            <!-- ERASER TOOLS -->
+            <!-- ADVANCED ERASER & COLOR ROLLER BLENDER -->
             <div class="bg-pink-50/80 border border-pink-200 rounded-xl p-2.5 shadow-sm space-y-2 shrink-0">
-                <div class="text-[11px] font-extrabold uppercase text-pink-700 tracking-wider">रबड़ (Canvas Eraser)</div>
+                <div class="flex items-center justify-between">
+                    <div class="text-[11px] font-extrabold uppercase text-pink-700 tracking-wider"><i class="fa-solid fa-paintbrush"></i> रबड़ व बैकग्राउंड रोलर</div>
+                    <span class="text-[9px] bg-pink-200 text-pink-900 font-bold px-1 rounded">Soft Blender</span>
+                </div>
                 
                 <button onmousedown="event.preventDefault()" id="eraserToggleBtn" onclick="toggleEraserTool()" class="w-full bg-white hover:bg-pink-600 text-slate-800 hover:text-white py-1 rounded-lg text-xs font-extrabold border border-pink-300 transition flex items-center justify-center gap-1 shadow-sm">
                     <i class="fa-solid fa-eraser text-pink-500"></i> <span id="eraserBtnText">रबड़ मोड चालू करें</span>
@@ -445,7 +448,7 @@
 
                 <div class="space-y-0.5 bg-white p-1.5 rounded-lg border border-pink-100 shadow-sm">
                     <div class="flex justify-between items-center text-[11px] font-bold text-pink-900">
-                        <span>आकार:</span>
+                        <span>रबड़ आकार (Brush Size):</span>
                         <span id="eraserSizeVal" class="font-extrabold">25px</span>
                     </div>
                     <input type="range" id="eraserSizeRange" min="5" max="150" value="25" oninput="updateEraserBrushSize()" class="w-full accent-pink-600 cursor-pointer h-1 bg-slate-200 rounded">
@@ -456,14 +459,31 @@
                     <button onmousedown="event.preventDefault()" onclick="setEraserShape('circle')" id="eraserCircleBtn" class="flex-1 bg-white text-slate-700 py-1 rounded-lg text-[11px] font-bold border border-pink-300 shadow-sm">◯ गोलाकार</button>
                 </div>
 
-                <!-- ERASER CUSTOM COLOR OPTION -->
-                <div class="flex items-center justify-between bg-white p-1.5 rounded-lg border border-pink-100 shadow-sm">
-                    <span class="text-[11px] font-bold text-pink-950">रबड़ का रंग:</span>
-                    <div class="flex items-center gap-1.5">
-                        <input type="color" id="eraserColor" value="#ffffff" class="w-5 h-5 p-0 border border-slate-300 rounded cursor-pointer">
-                        <button onmousedown="event.preventDefault()" onclick="pickEraserColorFromDocument()" class="bg-pink-50 hover:bg-pink-100 border border-pink-300 text-pink-800 px-1.5 py-0.5 rounded text-[10px] font-bold flex items-center gap-1">
-                            <i class="fa-solid fa-pipette text-pink-600"></i> रंग चुनें
-                        </button>
+                <!-- AUTO COLOR SAMPLER & ROLLER MIXER TOOL -->
+                <div class="bg-white p-2 rounded-lg border border-pink-200 space-y-1.5">
+                    <div class="flex items-center justify-between">
+                        <label class="flex items-center gap-1 text-[10px] font-extrabold text-pink-950 cursor-pointer">
+                            <input type="checkbox" id="autoBgColorToggle" checked class="accent-pink-600 w-3.5 h-3.5">
+                            <span>ऑटो बैकग्राउंड मैच (Auto Sample)</span>
+                        </label>
+                    </div>
+
+                    <div class="flex items-center justify-between border-t border-slate-100 pt-1">
+                        <span class="text-[10px] font-bold text-slate-700">कागज़ टोन (Paper Tint):</span>
+                        <div class="flex items-center gap-1">
+                            <input type="color" id="eraserColor" value="#ffffff" class="w-5 h-5 p-0 border border-slate-300 rounded cursor-pointer" title="Manual Background Color">
+                            <button onmousedown="event.preventDefault()" onclick="sampleCanvasBgColorCenter()" class="bg-pink-100 hover:bg-pink-200 text-pink-900 text-[10px] font-extrabold px-1.5 py-0.5 rounded border border-pink-300 flex items-center gap-1">
+                                <i class="fa-solid fa-eye-dropper"></i> रोलर पिकर
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="border-t border-slate-100 pt-1">
+                        <div class="flex justify-between items-center text-[10px] font-bold text-slate-700 mb-0.5">
+                            <span>किनारे धुंधले व मिक्स करें (Blur Feather):</span>
+                            <span id="eraserFeatherVal" class="text-pink-600 font-extrabold">6px</span>
+                        </div>
+                        <input type="range" id="eraserFeatherRange" min="0" max="30" value="6" oninput="document.getElementById('eraserFeatherVal').innerText = this.value + 'px'" class="w-full accent-pink-600 cursor-pointer h-1 bg-slate-200 rounded">
                     </div>
                 </div>
 
@@ -474,7 +494,7 @@
 
             <!-- ADVANCED UTILITIES -->
             <div class="bg-amber-50/80 border border-amber-200 rounded-xl p-2.5 shadow-sm space-y-1.5 shrink-0">
-                <div class="text-[11px] font-extrabold uppercase text-amber-800 tracking-wider">एडवांस टूल (Straighten & OCR)</div>
+                <div class="text-[11px] font-extrabold uppercase text-amber-800 tracking-wider">एडवांस टूल (Straighten & Reset)</div>
                 
                 <button onmousedown="event.preventDefault()" onclick="startStraightenTool()" id="straightenBtn" class="w-full bg-white hover:bg-sky-600 hover:text-white text-sky-900 py-1 rounded-lg text-xs font-extrabold border border-sky-300 transition flex items-center justify-center gap-1 shadow-sm">
                     <i class="fa-solid fa-crop-simple text-sky-600"></i> फोटो सीधा करें (Straighten)
@@ -537,7 +557,7 @@
                         <option value="pdf">PDF Document (.pdf)</option>
                         <option value="jpg">JPG Image (.jpg)</option>
                         <option value="png">PNG Image (.png)</option>
-                        <option value="txt">Text File (.txt)</option>
+                        <option value="txt">Text File (.txt - Full Extract)</option>
                     </select>
 
                     <button onclick="processExport()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold px-2.5 py-1 rounded-lg shadow text-xs transition">
@@ -568,7 +588,7 @@
                     <div id="canvasPlaceholder" class="p-16 text-center text-slate-400">
                         <i class="fa-solid fa-file-circle-plus text-5xl mb-3 text-slate-600 block"></i>
                         <p class="font-extrabold text-sm text-slate-300">कोई फाइल लोड नहीं है</p>
-                        <p class="text-xs text-slate-500 mt-1">बाईं तरफ साइडबार से PDF या फोटो अपलोड करें</p>
+                        <p class="text-xs text-slate-500 mt-1">बाईं तरफ साइडबार से PDF या multiple फोटो अपलोड करें</p>
                     </div>
                 </div>
             </div>
@@ -944,13 +964,32 @@
             }
         }
 
-        async function pickEraserColorFromDocument() {
+        async function sampleCanvasBgColorCenter() {
+            if (!masterCanvas || !masterCtx) return;
             if ('EyeDropper' in window) {
                 try {
                     const eyeDropper = new EyeDropper();
                     const result = await eyeDropper.open();
                     document.getElementById('eraserColor').value = result.sRGBHex;
+                    showToast("बैकग्राउंड रंग चुन लिया गया!");
                 } catch (e) {}
+            } else {
+                const p = masterCtx.getImageData(10, 10, 1, 1).data;
+                const hex = "#" + ((1 << 24) + (p[0] << 16) + (p[1] << 8) + p[2]).toString(16).slice(1);
+                document.getElementById('eraserColor').value = hex;
+                showToast("पेज बैकग्राउंड रंग ऑटो-पिक हो गया!");
+            }
+        }
+
+        function sampleAutoBgAtPos(x, y) {
+            if (!masterCtx || !masterCanvas) return document.getElementById('eraserColor').value || '#ffffff';
+            try {
+                const sampleX = Math.max(0, Math.min(masterCanvas.width - 5, x));
+                const sampleY = Math.max(0, Math.min(masterCanvas.height - 5, y));
+                const p = masterCtx.getImageData(sampleX, sampleY, 1, 1).data;
+                return "#" + ((1 << 24) + (p[0] << 16) + (p[1] << 8) + p[2]).toString(16).slice(1);
+            } catch(e) {
+                return document.getElementById('eraserColor').value || '#ffffff';
             }
         }
 
@@ -985,21 +1024,20 @@
             }
         }
 
-        /* -------------------------------------------------------------
-           SUPER FAST INSTANT (0-SECOND) FILE UPLOAD ENGINE
-        ------------------------------------------------------------- */
+        /* MULTIPLE FILES UPLOAD & INSTANT RENDER ENGINE */
         async function handleUniversalUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
+            const files = Array.from(event.target.files || []);
+            if (!files.length) return;
 
             if (typeof setMoveMode === 'function') setMoveMode(false);
 
-            let sizeFormatted = (file.size / 1024).toFixed(1) + " KB";
-            if (file.size > 1024 * 1024) sizeFormatted = (file.size / (1024 * 1024)).toFixed(2) + " MB";
+            let totalSize = files.reduce((acc, f) => acc + f.size, 0);
+            let sizeFormatted = (totalSize / 1024).toFixed(1) + " KB";
+            if (totalSize > 1024 * 1024) sizeFormatted = (totalSize / (1024 * 1024)).toFixed(2) + " MB";
             
-            loadedOriginalFileName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+            loadedOriginalFileName = files[0].name.substring(0, files[0].name.lastIndexOf('.')) || files[0].name;
 
-            document.getElementById('loadedFileNameDisplay').innerText = file.name;
+            document.getElementById('loadedFileNameDisplay').innerText = files.length === 1 ? files[0].name : `${files.length} फ़ाइलें चयनित`;
             document.getElementById('loadedFileSizeDisplay').innerText = sizeFormatted;
             document.getElementById('loadedFileInfo').classList.remove('hidden');
 
@@ -1008,104 +1046,87 @@
             undoStack = [];
             redoStack = [];
 
-            try {
-                if (file.type === 'application/pdf') {
-                    const arrayBuffer = await file.arrayBuffer();
-                    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-                    
-                    // Helper function to render a single PDF page
-                    async function fetchPdfPageData(pNum) {
-                        const page = await pdf.getPage(pNum);
-                        const viewport = page.getViewport({ scale: 2 });
+            showToast("फ़ाइलें प्रोसेस की जा रही हैं...");
 
-                        const canvas = document.createElement('canvas');
-                        canvas.height = viewport.height;
-                        canvas.width = viewport.width;
-                        const context = canvas.getContext('2d');
-                        await page.render({ canvasContext: context, viewport: viewport }).promise;
+            for (let file of files) {
+                try {
+                    if (file.type === 'application/pdf') {
+                        const arrayBuffer = await file.arrayBuffer();
+                        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                        
+                        for (let pNum = 1; pNum <= pdf.numPages; pNum++) {
+                            const page = await pdf.getPage(pNum);
+                            const viewport = page.getViewport({ scale: 2 });
 
-                        const textContent = await page.getTextContent();
-                        const pdfTextItems = textContent.items.map(item => {
-                            const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
-                            const fontHeight = Math.hypot(tx[2], tx[3]) || Math.abs(item.height * viewport.scale) || 12;
-                            return {
-                                str: item.str,
-                                x: tx[4],
-                                y: tx[5] - fontHeight,
-                                fontSize: fontHeight,
-                                width: Math.abs(item.width * viewport.scale),
-                                transform: tx
+                            const canvas = document.createElement('canvas');
+                            canvas.height = viewport.height;
+                            canvas.width = viewport.width;
+                            const context = canvas.getContext('2d');
+                            await page.render({ canvasContext: context, viewport: viewport }).promise;
+
+                            const textContent = await page.getTextContent();
+                            const pdfTextItems = textContent.items.map(item => {
+                                const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
+                                const fontHeight = Math.hypot(tx[2], tx[3]) || Math.abs(item.height * viewport.scale) || 12;
+                                return {
+                                    str: item.str,
+                                    x: tx[4],
+                                    y: tx[5] - fontHeight,
+                                    fontSize: fontHeight,
+                                    width: Math.abs(item.width * viewport.scale),
+                                    transform: tx
+                                };
+                            });
+
+                            pagesData.push({
+                                baseCanvas: cloneCanvas(canvas),
+                                rawCanvas: cloneCanvas(canvas),
+                                pdfTextItems: pdfTextItems,
+                                ocrWords: [],
+                                texts: []
+                            });
+                        }
+
+                    } else if (file.type.startsWith('image/')) {
+                        await new Promise((resolve) => {
+                            const objectUrl = URL.createObjectURL(file);
+                            const img = new Image();
+                            
+                            img.onload = function() {
+                                const canvas = document.createElement('canvas');
+                                canvas.width = img.width;
+                                canvas.height = img.height;
+                                canvas.getContext('2d').drawImage(img, 0, 0);
+                                URL.revokeObjectURL(objectUrl);
+
+                                const pageObj = {
+                                    baseCanvas: cloneCanvas(canvas),
+                                    rawCanvas: cloneCanvas(canvas),
+                                    pdfTextItems: [],
+                                    ocrWords: [],
+                                    texts: []
+                                };
+
+                                pagesData.push(pageObj);
+
+                                runImageOCR(canvas).then(ocrWords => {
+                                    pageObj.ocrWords = ocrWords;
+                                });
+                                resolve();
                             };
+                            img.src = objectUrl;
                         });
-
-                        return {
-                            baseCanvas: cloneCanvas(canvas),
-                            rawCanvas: cloneCanvas(canvas),
-                            pdfTextItems: pdfTextItems,
-                            ocrWords: [],
-                            texts: []
-                        };
                     }
-
-                    // 1. Process Page 1 and display INSTANTLY
-                    const page1Data = await fetchPdfPageData(1);
-                    pagesData.push(page1Data);
-
-                    updateMultiPageControlsUI();
-                    renderPageInEditor(0);
-                    resetZoom();
-
-                    // 2. Load remaining pages in the background asynchronously
-                    if (pdf.numPages > 1) {
-                        (async () => {
-                            for (let p = 2; p <= pdf.numPages; p++) {
-                                const pData = await fetchPdfPageData(p);
-                                pagesData.push(pData);
-                                updateMultiPageControlsUI();
-                            }
-                        })();
-                    }
-
-                } else if (file.type.startsWith('image/')) {
-                    // FAST ZERO-DELAY IMAGE LOADING WITH BLOB URL
-                    const objectUrl = URL.createObjectURL(file);
-                    const img = new Image();
-                    
-                    img.onload = function() {
-                        const canvas = document.createElement('canvas');
-                        canvas.width = img.width;
-                        canvas.height = img.height;
-                        canvas.getContext('2d').drawImage(img, 0, 0);
-                        URL.revokeObjectURL(objectUrl);
-
-                        const pageObj = {
-                            baseCanvas: cloneCanvas(canvas),
-                            rawCanvas: cloneCanvas(canvas),
-                            pdfTextItems: [],
-                            ocrWords: [],
-                            texts: []
-                        };
-
-                        pagesData.push(pageObj);
-
-                        // DISPLAY IMAGE IMMEDIATELY (0 SECONDS DELAY)
-                        updateMultiPageControlsUI();
-                        renderPageInEditor(0);
-                        resetZoom();
-
-                        // Run OCR in background without slowing down display
-                        runImageOCR(canvas).then(ocrWords => {
-                            pageObj.ocrWords = ocrWords;
-                            if (currentPageIndex === 0 && ocrWords.length > 0) {
-                                // quietly append OCR text layer if user is still on page 0
-                                renderPageInEditor(0);
-                            }
-                        });
-                    };
-                    img.src = objectUrl;
+                } catch (err) {
+                    console.error('File load error:', err);
                 }
-            } catch (err) {
-                alert('फाइल रेंडर करने में समस्या: ' + err.message);
+            }
+
+            if (pagesData.length > 0) {
+                updateMultiPageControlsUI();
+                renderPageInEditor(0);
+                resetZoom();
+                showToast(`${pagesData.length} पेज सफलतापूर्वक लोड हुए`);
             }
         }
 
@@ -1714,7 +1735,7 @@
             if (isEraserMode) {
                 deselectAllText();
                 btn.className = "w-full bg-pink-600 text-white py-1 rounded-lg text-xs font-extrabold border border-pink-600 shadow-sm";
-                txt.innerText = "रबड़ एक्टिव है";
+                txt.innerText = "रबड़ व रोलर एक्टिव है";
                 if (masterCanvas) masterCanvas.classList.add('eraser-active');
                 if (canvasContainer) canvasContainer.classList.add('eraser-mode-active');
             } else {
@@ -1868,18 +1889,42 @@
             if (precisionEraser.handle) precisionEraser.handle.remove();
             precisionEraser = { active: false, center: null, radius: 25, handle: null };
         }
-        
+
+        /* -------------------------------------------------------------
+           SEAMLESS SOFT FEATHER BLENDING ERASER (NO Sharp Boxes)
+        ------------------------------------------------------------- */
         function erasePrecisionSelection() {
             if (!precisionEraser.active || !masterCanvas) { alert('पहले गोल क्षेत्र सेलेक्ट करें।'); return; }
             saveUndoState();
             const { center, radius } = precisionEraser;
-            const eraseColor = document.getElementById('eraserColor').value || '#ffffff';
+            
+            const isAutoBg = document.getElementById('autoBgColorToggle').checked;
+            const eraseColor = isAutoBg ? sampleAutoBgAtPos(center.x - radius - 2, center.y - radius - 2) : (document.getElementById('eraserColor').value || '#ffffff');
+            const feather = parseInt(document.getElementById('eraserFeatherRange').value) || 0;
 
             masterCtx.save(); 
-            masterCtx.fillStyle = eraseColor; 
-            masterCtx.beginPath(); 
-            masterCtx.arc(center.x, center.y, radius, 0, Math.PI * 2); 
-            masterCtx.fill(); 
+            if (feather > 0) {
+                // Soft Gaussian Blur offscreen blending
+                const pad = feather * 3;
+                const diameter = (radius + pad) * 2;
+                const off = document.createElement('canvas');
+                off.width = diameter;
+                off.height = diameter;
+                const octx = off.getContext('2d');
+
+                octx.filter = `blur(${feather}px)`;
+                octx.fillStyle = eraseColor;
+                octx.beginPath();
+                octx.arc(diameter / 2, diameter / 2, Math.max(1, radius - 2), 0, Math.PI * 2);
+                octx.fill();
+
+                masterCtx.drawImage(off, center.x - diameter / 2, center.y - diameter / 2);
+            } else {
+                masterCtx.fillStyle = eraseColor; 
+                masterCtx.beginPath(); 
+                masterCtx.arc(center.x, center.y, radius, 0, Math.PI * 2); 
+                masterCtx.fill(); 
+            }
             masterCtx.restore();
 
             document.querySelectorAll('.seamless-text-item').forEach(el => {
@@ -1893,10 +1938,29 @@
 
         function eraseRectSelection(x, y, w, h) {
             saveUndoState();
-            const eraseColor = document.getElementById('eraserColor').value || '#ffffff';
+            
+            const isAutoBg = document.getElementById('autoBgColorToggle').checked;
+            const eraseColor = isAutoBg ? sampleAutoBgAtPos(x - 4, y - 4) : (document.getElementById('eraserColor').value || '#ffffff');
+            const feather = parseInt(document.getElementById('eraserFeatherRange').value) || 0;
+
             masterCtx.save(); 
-            masterCtx.fillStyle = eraseColor; 
-            masterCtx.fillRect(x, y, w, h); 
+            if (feather > 0) {
+                // Ultra Smooth Gaussian Feather Blend
+                const pad = feather * 3;
+                const off = document.createElement('canvas');
+                off.width = w + pad * 2;
+                off.height = h + pad * 2;
+                const octx = off.getContext('2d');
+
+                octx.filter = `blur(${feather}px)`;
+                octx.fillStyle = eraseColor;
+                octx.fillRect(pad, pad, w, h);
+
+                masterCtx.drawImage(off, x - pad, y - pad);
+            } else {
+                masterCtx.fillStyle = eraseColor; 
+                masterCtx.fillRect(x, y, w, h); 
+            }
             masterCtx.restore();
 
             document.querySelectorAll('.seamless-text-item').forEach(el => {
@@ -2198,7 +2262,7 @@
                     (pastedCenterY / masterCanvas.height) * masterCanvas.getBoundingClientRect().height
             );
 
-            showToast("शब्द पेस्ट हो गया! Mouse/Arrow से जगह बदलें। Ctrl+Z एक बार दबाने पर सिर्फ यही paste हटेगा।");
+            showToast("शब्द पेस्ट हो गया! Mouse/Arrow से जगह बदलें।");
             return true;
         }
 
@@ -2598,14 +2662,44 @@
             let exportFilename = `${loadedOriginalFileName}_edited.${format}`;
 
             if (format === 'txt') {
-                let fullText = "";
+                let fullText = "========================================\n";
+                fullText += `        G BISHT PAGE EDITOR - EXPORTED TEXT\n`;
+                fullText += `========================================\n\n`;
+
                 pagesData.forEach((p, idx) => {
-                    fullText += `--- Page ${idx + 1} ---\n`;
-                    (p.texts || []).forEach(t => { fullText += t.text + '\n'; });
+                    fullText += `----------------------------------------\n`;
+                    fullText += `            पेज / PAGE ${idx + 1}\n`;
+                    fullText += `----------------------------------------\n\n`;
+
+                    if (p.pdfTextItems && p.pdfTextItems.length > 0) {
+                        fullText += `[मूल पीडीएफ टेक्स्ट (Original PDF Text)]:\n`;
+                        let pdfStr = p.pdfTextItems.map(item => item.str).join(" ");
+                        fullText += pdfStr + "\n\n";
+                    }
+
+                    if (p.ocrWords && p.ocrWords.length > 0) {
+                        fullText += `[स्कैन किया हुआ टेक्स्ट (OCR Extracted)]:\n`;
+                        let ocrStr = p.ocrWords.map(w => w.text).join(" ");
+                        fullText += ocrStr + "\n\n";
+                    }
+
+                    if (p.texts && p.texts.length > 0) {
+                        fullText += `[संपादित / जोड़ा गया नया टेक्स्ट (Edited Elements)]:\n`;
+                        p.texts.forEach(t => { 
+                            if (t.text && t.text.trim()) {
+                                fullText += `• ${t.text.trim()}\n`; 
+                            }
+                        });
+                        fullText += "\n";
+                    }
+
+                    fullText += "\n";
                 });
-                const blob = new Blob([fullText || "No Text"], { type: 'text/plain' });
+
+                const blob = new Blob([fullText], { type: 'text/plain;charset=utf-8' });
                 const finalBlob = isTargetSizeOn ? padBlobToTargetSize(blob, targetBytes) : blob;
-                triggerDownload(finalBlob, `${loadedOriginalFileName}_edited.txt`);
+                triggerDownload(finalBlob, `${loadedOriginalFileName}_text.txt`);
+                showToast("टेक्स्ट फ़ाइल सफलता से डाउनलोड हुई!");
                 return;
             }
 
