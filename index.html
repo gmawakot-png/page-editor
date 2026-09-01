@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Page Editor - Multi-File & Color Mixer</title>
+    <title>G Bisht Pro - Page Editor (Rotate + ZIP + Compact UI)</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -17,6 +17,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
     <style>
         body { font-family: 'Plus Jakarta Sans', 'Noto Sans Devanagari', sans-serif; }
@@ -284,6 +285,23 @@
             pointer-events: none !important;
             user-select: none !important;
         }
+
+        /* Compact collapsible panels */
+        .tool-panel { transition: all 0.2s ease; }
+        .tool-panel-body { max-height: 0; overflow: hidden; transition: max-height 0.25s ease; }
+        .tool-panel.open .tool-panel-body { max-height: 900px; }
+        .tool-panel-header { cursor: pointer; user-select: none; }
+        .tool-panel-header .chevron { transition: transform 0.2s; }
+        .tool-panel.open .tool-panel-header .chevron { transform: rotate(180deg); }
+
+        /* Compact dropdown style */
+        .compact-select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2364748b' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 6px center;
+            padding-right: 22px;
+        }
 </style>
 </head>
 <body class="bg-slate-100 text-slate-800 h-screen flex flex-col overflow-hidden select-none">
@@ -304,11 +322,11 @@
             </div>
             <div>
                 <h1 class="text-sm font-extrabold text-slate-900 leading-tight">G Bisht Pro</h1>
-                <p class="text-[10px] font-semibold text-slate-500">Page Editor & Color Mixer</p>
+                <p class="text-[10px] font-semibold text-slate-500">Page Editor · Rotate · ZIP</p>
             </div>
         </div>
 
-        <!-- ACTIONS & TOOLS (Move + Straighten & Reset) -->
+        <!-- ACTIONS & TOOLS -->
         <div class="flex items-center gap-1.5 flex-wrap">
             
             <!-- MOVE TOOLBAR GROUP -->
@@ -317,29 +335,43 @@
                     <i class="fa-solid fa-arrows-up-down-left-right"></i> Move
                 </button>
                 <button id="moveCutBtn" type="button" class="bg-rose-600 hover:bg-rose-700 text-white px-2 py-1 rounded-md font-bold text-xs transition" title="Cut selected area">
-                    <i class="fa-solid fa-scissors"></i> Cut
+                    <i class="fa-solid fa-scissors"></i>
                 </button>
                 <button id="moveCopyBtn" type="button" class="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded-md font-bold text-xs transition" title="Copy selected area">
-                    <i class="fa-regular fa-copy"></i> Copy
+                    <i class="fa-regular fa-copy"></i>
                 </button>
                 <button id="movePasteBtn" type="button" class="bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded-md font-bold text-xs transition" title="Paste selected area">
-                    <i class="fa-solid fa-paste"></i> Paste
+                    <i class="fa-solid fa-paste"></i>
+                </button>
+            </div>
+
+            <!-- ROTATE + FLIP GROUP (NEW) -->
+            <div class="flex items-center gap-1 bg-violet-50 p-1 rounded-lg border border-violet-200">
+                <button onmousedown="event.preventDefault()" onclick="rotateCanvas(-90)" class="bg-violet-600 hover:bg-violet-700 text-white px-2 py-1 rounded-md text-xs font-bold transition" title="बाएँ घुमाएँ 90°">
+                    <i class="fa-solid fa-rotate-left"></i>
+                </button>
+                <button onmousedown="event.preventDefault()" onclick="rotateCanvas(90)" class="bg-violet-600 hover:bg-violet-700 text-white px-2 py-1 rounded-md text-xs font-bold transition" title="दाएँ घुमाएँ 90°">
+                    <i class="fa-solid fa-rotate-right"></i>
+                </button>
+                <button onmousedown="event.preventDefault()" onclick="flipCanvas('h')" class="bg-white hover:bg-violet-100 text-violet-800 px-2 py-1 rounded-md text-xs font-bold border border-violet-300 transition" title="Horizontal Flip">
+                    <i class="fa-solid fa-left-right"></i>
+                </button>
+                <button onmousedown="event.preventDefault()" onclick="flipCanvas('v')" class="bg-white hover:bg-violet-100 text-violet-800 px-2 py-1 rounded-md text-xs font-bold border border-violet-300 transition" title="Vertical Flip">
+                    <i class="fa-solid fa-up-down"></i>
                 </button>
             </div>
 
             <!-- STRAIGHTEN & RESET GROUP -->
             <div class="flex items-center gap-1 bg-amber-50/80 p-1 rounded-lg border border-amber-200">
                 <button onmousedown="event.preventDefault()" onclick="startStraightenTool()" id="straightenBtn" class="bg-sky-600 hover:bg-sky-700 text-white px-2.5 py-1 rounded-md text-xs font-bold transition flex items-center gap-1" title="फोटो सीधा करें (Straighten)">
-                    <i class="fa-solid fa-crop-simple"></i> सीधा करें
+                    <i class="fa-solid fa-crop-simple"></i> सीधा
                 </button>
-
                 <div id="straightenControls" class="hidden flex gap-1">
-                    <button onmousedown="event.preventDefault()" onclick="applyStraightenTool()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded-md text-xs font-extrabold shadow-sm">✓ लागू करें</button>
-                    <button onmousedown="event.preventDefault()" onclick="cancelStraightenTool()" class="bg-white text-slate-700 px-2 py-1 rounded-md text-xs font-bold border border-slate-300 shadow-sm">रद्द</button>
+                    <button onmousedown="event.preventDefault()" onclick="applyStraightenTool()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded-md text-xs font-extrabold shadow-sm">✓</button>
+                    <button onmousedown="event.preventDefault()" onclick="cancelStraightenTool()" class="bg-white text-slate-700 px-2 py-1 rounded-md text-xs font-bold border border-slate-300 shadow-sm">✕</button>
                 </div>
-
-                <button onmousedown="event.preventDefault()" onclick="reloadOriginalCanvasState()" class="bg-white hover:bg-red-50 text-red-600 px-2 py-1 rounded-md text-xs font-bold border border-red-200 transition flex items-center gap-1" title="कैनवास रीसेट करें">
-                    <i class="fa-solid fa-rotate-left"></i> रीसेट
+                <button onmousedown="event.preventDefault()" onclick="reloadOriginalCanvasState()" class="bg-white hover:bg-red-50 text-red-600 px-2 py-1 rounded-md text-xs font-bold border border-red-200 transition" title="कैनवास रीसेट करें">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
                 </button>
             </div>
         </div>
@@ -351,7 +383,7 @@
             <div class="flex items-center gap-1.5 bg-slate-800 text-white px-2 py-1 rounded-lg border border-slate-700 text-xs shadow-sm">
                 <label class="flex items-center gap-1 cursor-pointer select-none text-[11px] font-bold text-slate-300">
                     <input type="checkbox" id="targetSizeToggle" onchange="toggleTargetSizeState()" class="accent-pink-500 w-3.5 h-3.5 cursor-pointer">
-                    <span>Target Size</span>
+                    <span>Size</span>
                 </label>
                 <div id="targetInputs" class="flex items-center gap-1 opacity-40 pointer-events-none transition-all">
                     <input type="number" id="targetSizeValue" value="5" class="w-11 bg-slate-900 border border-slate-600 rounded px-1 py-0.5 text-xs font-bold text-white text-center outline-none">
@@ -362,15 +394,16 @@
                 </div>
             </div>
 
-            <!-- EXPORT SELECT & DOWNLOAD BUTTON -->
+            <!-- EXPORT SELECT & DOWNLOAD BUTTON (with ZIP) -->
             <div class="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
-                <select id="exportFormat" class="bg-white border border-slate-300 text-slate-800 rounded-md px-1.5 py-1 text-xs font-bold outline-none">
-                    <option value="pdf">PDF (.pdf)</option>
-                    <option value="jpg">JPG (.jpg)</option>
-                    <option value="png">PNG (.png)</option>
+                <select id="exportFormat" class="bg-white border border-slate-300 text-slate-800 rounded-md px-1.5 py-1 text-xs font-bold outline-none compact-select">
+                    <option value="jpg">JPG (एक)</option>
+                    <option value="png">PNG (एक)</option>
+                    <option value="pdf">PDF (सभी)</option>
+                    <option value="zip-jpg">ZIP JPG (सभी)</option>
+                    <option value="zip-png">ZIP PNG (सभी)</option>
                     <option value="txt">Text (.txt)</option>
                 </select>
-
                 <button onclick="processExport()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-2.5 py-1 rounded-md shadow-sm text-xs transition flex items-center gap-1">
                     <i class="fa-solid fa-download"></i> डाउनलोड
                 </button>
@@ -378,7 +411,7 @@
 
             <!-- PRINT BUTTON -->
             <button onclick="triggerCleanPrint()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow transition flex items-center gap-1.5">
-                <i class="fa-solid fa-print"></i> प्रिंट
+                <i class="fa-solid fa-print"></i>
             </button>
         </div>
     </header>
@@ -416,87 +449,82 @@
                 <button onclick="changePdfPage(1)" class="bg-indigo-700 hover:bg-indigo-600 px-2.5 py-1 rounded-lg transition">अगला <i class="fa-solid fa-chevron-right"></i></button>
             </div>
 
-            <!-- FONT FAMILY & INK CONTROLS -->
-            <div class="bg-indigo-50/80 border border-indigo-200 rounded-xl p-2.5 shadow-sm space-y-2 shrink-0">
-                <div class="text-[11px] font-extrabold uppercase text-indigo-700 tracking-wider">फॉन्ट व स्याही सेटिंग्स</div>
-                
-                <div>
-                    <label class="text-[11px] font-bold text-slate-700 block mb-0.5">फॉन्ट शैली (Font Style):</label>
-                    <select id="editorFontFamily" onchange="applyFontToActiveText()" class="w-full bg-white border border-slate-300 rounded-lg p-1 text-xs font-bold text-indigo-950 outline-none shadow-sm">
-                        <option value="font-devanagari">प्रिंट हिंदी (Modern Sans)</option>
-                        <option value="font-devanagari-serif">सरकारी फॉर्म (Serif Print)</option>
-                        <option value="font-handwriting">हस्तलेखन (Real Ink Pen)</option>
-                        <option value="font-typewriter">टाइपराइटर (Typewriter)</option>
-                    </select>
+            <!-- FONT FAMILY & INK CONTROLS (COLLAPSIBLE) -->
+            <div class="tool-panel open bg-indigo-50/80 border border-indigo-200 rounded-xl shadow-sm shrink-0">
+                <div class="tool-panel-header flex items-center justify-between px-2.5 py-2" onclick="this.parentElement.classList.toggle('open')">
+                    <div class="text-[11px] font-extrabold uppercase text-indigo-700 tracking-wider">फॉन्ट व स्याही</div>
+                    <i class="fa-solid fa-chevron-down chevron text-indigo-500 text-xs"></i>
                 </div>
-
-                <div>
-                    <label class="text-[11px] font-bold text-slate-700 block mb-0.5">स्याही टोन (Ink Tone):</label>
-                    <select id="editorInkColor" onchange="applyPresetInkColor(this.value)" class="w-full bg-white border border-slate-300 rounded-lg p-1 text-xs font-bold text-slate-800 outline-none shadow-sm">
-                        <option value="#22252a">🖤 ओरिजिनल स्याही (Charcoal)</option>
-                        <option value="#1e3a8a">💙 नीली स्याही (Blue Ballpen)</option>
-                        <option value="#374151">🩶 हल्का फीका प्रिंट (Light Faded)</option>
-                        <option value="#000000">🖤 गहरा काला (Pure Black)</option>
-                    </select>
-                </div>
-
-                <!-- INK OPACITY SLIDER -->
-                <div class="bg-white p-1.5 rounded-lg border border-indigo-100 shadow-sm">
-                    <div class="flex justify-between items-center text-[11px] font-bold text-slate-700 mb-0.5">
-                        <span>स्याही का गाढ़ापन:</span>
-                        <span id="inkOpacityVal" class="text-indigo-600 font-extrabold">88%</span>
+                <div class="tool-panel-body px-2.5 pb-2.5 space-y-2">
+                    <div>
+                        <label class="text-[11px] font-bold text-slate-700 block mb-0.5">फॉन्ट शैली:</label>
+                        <select id="editorFontFamily" onchange="applyFontToActiveText()" class="w-full bg-white border border-slate-300 rounded-lg p-1 text-xs font-bold text-indigo-950 outline-none shadow-sm compact-select">
+                            <option value="font-devanagari">प्रिंट हिंदी (Modern Sans)</option>
+                            <option value="font-devanagari-serif">सरकारी फॉर्म (Serif Print)</option>
+                            <option value="font-handwriting">हस्तलेखन (Real Ink Pen)</option>
+                            <option value="font-typewriter">टाइपराइटर (Typewriter)</option>
+                        </select>
                     </div>
-                    <input type="range" id="inkOpacityRange" min="40" max="100" value="88" oninput="updateInkOpacityLabel()" class="w-full accent-indigo-600 cursor-pointer h-1 bg-slate-200 rounded">
-                </div>
-
-                <!-- TEXT BLUR / CLARITY SLIDER -->
-                <div class="bg-white p-1.5 rounded-lg border border-indigo-100 shadow-sm">
-                    <div class="flex justify-between items-center text-[11px] font-bold text-slate-700 mb-0.5">
-                        <span>शब्द धुंधलापन (Blur / Clarity):</span>
-                        <span id="textBlurVal" class="text-indigo-600 font-extrabold">0px</span>
+                    <div>
+                        <label class="text-[11px] font-bold text-slate-700 block mb-0.5">स्याही टोन:</label>
+                        <select id="editorInkColor" onchange="applyPresetInkColor(this.value)" class="w-full bg-white border border-slate-300 rounded-lg p-1 text-xs font-bold text-slate-800 outline-none shadow-sm compact-select">
+                            <option value="#22252a">🖤 ओरिजिनल स्याही</option>
+                            <option value="#1e3a8a">💙 नीली स्याही</option>
+                            <option value="#374151">🩶 हल्का फीका प्रिंट</option>
+                            <option value="#000000">🖤 गहरा काला</option>
+                        </select>
                     </div>
-                    <input type="range" id="textBlurRange" min="0" max="4" step="0.2" value="0" oninput="updateTextBlurLabel()" class="w-full accent-indigo-600 cursor-pointer h-1 bg-slate-200 rounded">
-                </div>
-
-                <!-- FONT SIZE & WEIGHT ADJUSTMENTS -->
-                <div class="grid grid-cols-2 gap-1.5">
-                    <div class="flex items-center justify-between bg-white p-1.5 rounded-lg border border-indigo-100 shadow-sm">
-                        <span class="text-[11px] font-bold text-slate-700">साइज:</span>
-                        <div class="flex items-center gap-1">
-                            <button onmousedown="event.preventDefault()" onclick="adjustSelectedFontSize(-2)" class="w-4 h-4 rounded bg-slate-100 font-extrabold text-xs text-slate-700 hover:bg-indigo-600 hover:text-white flex items-center justify-center">-</button>
-                            <span id="fontSizeVal" class="text-[11px] font-extrabold text-indigo-700 min-w-[20px] text-center">24px</span>
-                            <button onmousedown="event.preventDefault()" onclick="adjustSelectedFontSize(2)" class="w-4 h-4 rounded bg-slate-100 font-extrabold text-xs text-slate-700 hover:bg-indigo-600 hover:text-white flex items-center justify-center">+</button>
+                    <div class="bg-white p-1.5 rounded-lg border border-indigo-100 shadow-sm">
+                        <div class="flex justify-between items-center text-[11px] font-bold text-slate-700 mb-0.5">
+                            <span>गाढ़ापन:</span>
+                            <span id="inkOpacityVal" class="text-indigo-600 font-extrabold">88%</span>
+                        </div>
+                        <input type="range" id="inkOpacityRange" min="40" max="100" value="88" oninput="updateInkOpacityLabel()" class="w-full accent-indigo-600 cursor-pointer h-1 bg-slate-200 rounded">
+                    </div>
+                    <div class="bg-white p-1.5 rounded-lg border border-indigo-100 shadow-sm">
+                        <div class="flex justify-between items-center text-[11px] font-bold text-slate-700 mb-0.5">
+                            <span>धुंधलापन:</span>
+                            <span id="textBlurVal" class="text-indigo-600 font-extrabold">0px</span>
+                        </div>
+                        <input type="range" id="textBlurRange" min="0" max="4" step="0.2" value="0" oninput="updateTextBlurLabel()" class="w-full accent-indigo-600 cursor-pointer h-1 bg-slate-200 rounded">
+                    </div>
+                    <div class="grid grid-cols-2 gap-1.5">
+                        <div class="flex items-center justify-between bg-white p-1.5 rounded-lg border border-indigo-100 shadow-sm">
+                            <span class="text-[11px] font-bold text-slate-700">साइज:</span>
+                            <div class="flex items-center gap-1">
+                                <button onmousedown="event.preventDefault()" onclick="adjustSelectedFontSize(-2)" class="w-4 h-4 rounded bg-slate-100 font-extrabold text-xs text-slate-700 hover:bg-indigo-600 hover:text-white flex items-center justify-center">-</button>
+                                <span id="fontSizeVal" class="text-[11px] font-extrabold text-indigo-700 min-w-[20px] text-center">24px</span>
+                                <button onmousedown="event.preventDefault()" onclick="adjustSelectedFontSize(2)" class="w-4 h-4 rounded bg-slate-100 font-extrabold text-xs text-slate-700 hover:bg-indigo-600 hover:text-white flex items-center justify-center">+</button>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between bg-white p-1.5 rounded-lg border border-indigo-100 shadow-sm">
+                            <span class="text-[11px] font-bold text-slate-700">मोटाई:</span>
+                            <div class="flex items-center gap-1">
+                                <button onmousedown="event.preventDefault()" onclick="adjustSelectedFontWeight(-100)" class="w-4 h-4 rounded bg-slate-100 font-extrabold text-xs text-slate-700 hover:bg-indigo-600 hover:text-white flex items-center justify-center">-</button>
+                                <span id="fontWeightVal" class="text-[11px] font-extrabold text-indigo-700 min-w-[20px] text-center">400</span>
+                                <button onmousedown="event.preventDefault()" onclick="adjustSelectedFontWeight(100)" class="w-4 h-4 rounded bg-slate-100 font-extrabold text-xs text-slate-700 hover:bg-indigo-600 hover:text-white flex items-center justify-center">+</button>
+                            </div>
                         </div>
                     </div>
-
                     <div class="flex items-center justify-between bg-white p-1.5 rounded-lg border border-indigo-100 shadow-sm">
-                        <span class="text-[11px] font-bold text-slate-700">मोटाई:</span>
-                        <div class="flex items-center gap-1">
-                            <button onmousedown="event.preventDefault()" onclick="adjustSelectedFontWeight(-100)" class="w-4 h-4 rounded bg-slate-100 font-extrabold text-xs text-slate-700 hover:bg-indigo-600 hover:text-white flex items-center justify-center">-</button>
-                            <span id="fontWeightVal" class="text-[11px] font-extrabold text-indigo-700 min-w-[20px] text-center">400</span>
-                            <button onmousedown="event.preventDefault()" onclick="adjustSelectedFontWeight(100)" class="w-4 h-4 rounded bg-slate-100 font-extrabold text-xs text-slate-700 hover:bg-indigo-600 hover:text-white flex items-center justify-center">+</button>
+                        <span class="text-[11px] font-bold text-slate-700">कस्टम रंग:</span>
+                        <div class="flex items-center gap-1.5">
+                            <input type="color" id="liveInkColor" value="#22252a" onchange="applySelectedInkColor(this.value)" class="w-5 h-5 p-0 border border-slate-300 rounded cursor-pointer">
+                            <button onmousedown="event.preventDefault()" onclick="pickColorFromDocument()" class="bg-indigo-50 hover:bg-indigo-100 border border-indigo-300 text-indigo-800 px-1.5 py-0.5 rounded text-[10px] font-bold flex items-center gap-1">
+                                <i class="fa-solid fa-pipette text-indigo-600"></i> पिकर
+                            </button>
                         </div>
-                    </div>
-                </div>
-
-                <div class="flex items-center justify-between bg-white p-1.5 rounded-lg border border-indigo-100 shadow-sm">
-                    <span class="text-[11px] font-bold text-slate-700">कस्टम रंग:</span>
-                    <div class="flex items-center gap-1.5">
-                        <input type="color" id="liveInkColor" value="#22252a" onchange="applySelectedInkColor(this.value)" class="w-5 h-5 p-0 border border-slate-300 rounded cursor-pointer">
-                        <button onmousedown="event.preventDefault()" onclick="pickColorFromDocument()" class="bg-indigo-50 hover:bg-indigo-100 border border-indigo-300 text-indigo-800 px-1.5 py-0.5 rounded text-[10px] font-bold flex items-center gap-1">
-                            <i class="fa-solid fa-pipette text-indigo-600"></i> पिकर
-                        </button>
                     </div>
                 </div>
             </div>
 
-            <!-- ADVANCED ERASER & COLOR ROLLER BLENDER -->
-            <div class="bg-pink-50/80 border border-pink-200 rounded-xl p-2.5 shadow-sm space-y-2 shrink-0">
-                <div class="flex items-center justify-between">
-                    <div class="text-[11px] font-extrabold uppercase text-pink-700 tracking-wider"><i class="fa-solid fa-paintbrush"></i> रबड़ व बैकग्राउंड रोलर</div>
-                    <span class="text-[9px] bg-pink-200 text-pink-900 font-bold px-1 rounded">Soft Blender</span>
+            <!-- ADVANCED ERASER & COLOR ROLLER (COLLAPSIBLE) -->
+            <div class="tool-panel open bg-pink-50/80 border border-pink-200 rounded-xl shadow-sm shrink-0">
+                <div class="tool-panel-header flex items-center justify-between px-2.5 py-2" onclick="this.parentElement.classList.toggle('open')">
+                    <div class="text-[11px] font-extrabold uppercase text-pink-700 tracking-wider"><i class="fa-solid fa-paintbrush"></i> रबड़ व रोलर</div>
+                    <i class="fa-solid fa-chevron-down chevron text-pink-500 text-xs"></i>
                 </div>
-                
+                <div class="tool-panel-body px-2.5 pb-2.5 space-y-2">
                 <button onmousedown="event.preventDefault()" id="eraserToggleBtn" onclick="toggleEraserTool()" class="w-full bg-white hover:bg-pink-600 text-slate-800 hover:text-white py-1 rounded-lg text-xs font-extrabold border border-pink-300 transition flex items-center justify-center gap-1 shadow-sm">
                     <i class="fa-solid fa-eraser text-pink-500"></i> <span id="eraserBtnText">रबड़ मोड चालू करें</span>
                 </button>
@@ -545,11 +573,12 @@
                 <button onmousedown="event.preventDefault()" onclick="erasePrecisionSelection()" class="w-full bg-pink-100 hover:bg-pink-600 hover:text-white text-pink-900 py-1 rounded-lg text-[11px] font-extrabold border border-pink-200 transition shadow-sm">
                     चयनित गोलाकार भाग मिटाएँ
                 </button>
+                </div>
             </div>
 
-            <!-- BRIGHTNESS / CONTRAST -->
-            <div class="bg-white border border-slate-200 rounded-xl p-2.5 shadow-sm space-y-1.5 shrink-0">
-                <div class="text-[11px] font-extrabold uppercase text-slate-500 tracking-wider">लाइटिंग (Lighting Controls)</div>
+            <!-- BRIGHTNESS / CONTRAST (compact) -->
+            <div class="bg-white border border-slate-200 rounded-xl p-2 shadow-sm space-y-1.5 shrink-0">
+                <div class="text-[11px] font-extrabold uppercase text-slate-500 tracking-wider">लाइटिंग</div>
                 <div class="flex items-center gap-2">
                     <i class="fa-solid fa-sun text-amber-500 text-xs"></i>
                     <input type="range" id="brightnessRange" min="50" max="180" value="100" oninput="applyImageFilters()" class="w-full accent-amber-500 cursor-pointer h-1 bg-slate-200 rounded">
@@ -2633,6 +2662,94 @@
             return outCanvas;
         }
 
+        /* ========== ROTATE & FLIP ENGINE ========== */
+        function rotateCanvas(degrees) {
+            if (!masterCanvas || !masterCtx || !pagesData[currentPageIndex]) {
+                showToast("पहले फाइल लोड करें");
+                return;
+            }
+            commitActivePastedObject();
+            saveUndoState();
+
+            const src = masterCanvas;
+            const w = src.width;
+            const h = src.height;
+            const rad = (degrees * Math.PI) / 180;
+
+            // New dimensions for 90° rotations
+            const is90 = Math.abs(degrees) % 180 === 90;
+            const newW = is90 ? h : w;
+            const newH = is90 ? w : h;
+
+            const out = document.createElement('canvas');
+            out.width = newW;
+            out.height = newH;
+            const octx = out.getContext('2d');
+
+            octx.translate(newW / 2, newH / 2);
+            octx.rotate(rad);
+            octx.drawImage(src, -w / 2, -h / 2);
+
+            // Also rotate text positions
+            const texts = captureTextEdits();
+            const rotatedTexts = texts.map(t => {
+                let nx = t.canvasX - w / 2;
+                let ny = t.canvasY - h / 2;
+                const cos = Math.cos(rad), sin = Math.sin(rad);
+                const rx = nx * cos - ny * sin;
+                const ry = nx * sin + ny * cos;
+                return {
+                    ...t,
+                    canvasX: rx + newW / 2,
+                    canvasY: ry + newH / 2
+                };
+            });
+
+            pagesData[currentPageIndex].baseCanvas = out;
+            pagesData[currentPageIndex].texts = rotatedTexts;
+            // Keep rawCanvas as original for reset
+            renderPageInEditor(currentPageIndex);
+            showToast(degrees > 0 ? "दाएँ 90° घुमाया" : "बाएँ 90° घुमाया");
+        }
+
+        function flipCanvas(axis) {
+            if (!masterCanvas || !masterCtx || !pagesData[currentPageIndex]) {
+                showToast("पहले फाइल लोड करें");
+                return;
+            }
+            commitActivePastedObject();
+            saveUndoState();
+
+            const src = masterCanvas;
+            const w = src.width;
+            const h = src.height;
+            const out = document.createElement('canvas');
+            out.width = w;
+            out.height = h;
+            const octx = out.getContext('2d');
+
+            if (axis === 'h') {
+                octx.translate(w, 0);
+                octx.scale(-1, 1);
+            } else {
+                octx.translate(0, h);
+                octx.scale(1, -1);
+            }
+            octx.drawImage(src, 0, 0);
+
+            const texts = captureTextEdits();
+            const flipped = texts.map(t => ({
+                ...t,
+                canvasX: axis === 'h' ? (w - t.canvasX - 10) : t.canvasX,
+                canvasY: axis === 'v' ? (h - t.canvasY - 10) : t.canvasY
+            }));
+
+            pagesData[currentPageIndex].baseCanvas = out;
+            pagesData[currentPageIndex].texts = flipped;
+            renderPageInEditor(currentPageIndex);
+            showToast(axis === 'h' ? "Horizontal Flip" : "Vertical Flip");
+        }
+
         async function processExport() {
             if (!masterCanvas || pagesData.length === 0) return alert('डाउनलोड करने के लिए पहले कोई फाइल अपलोड करें!');
             
@@ -2651,7 +2768,7 @@
                 if (targetUnit === 'MB') targetBytes *= 1024 * 1024;
             }
 
-            let exportFilename = `${loadedOriginalFileName}_edited.${format}`;
+            let exportFilename = `${loadedOriginalFileName}_edited.${format.includes('zip') ? 'zip' : format}`;
 
             if (format === 'txt') {
                 let fullText = "========================================\n";
@@ -2695,15 +2812,48 @@
                 return;
             }
 
+            // Single JPG / PNG (current page only) – simple & fast
             if (format === 'jpg' || format === 'png') {
                 const canvas = await getFlattenedCanvasForPage(currentPageIndex);
                 const mime = format === 'jpg' ? 'image/jpeg' : 'image/png';
-                const dataUrl = canvas.toDataURL(mime, 0.95);
+                const quality = format === 'jpg' ? 0.92 : undefined;
+                const dataUrl = canvas.toDataURL(mime, quality);
                 const res = await fetch(dataUrl);
                 let imageBlob = await res.blob();
 
                 const finalBlob = isTargetSizeOn ? padBlobToTargetSize(imageBlob, targetBytes) : imageBlob;
-                triggerDownload(finalBlob, exportFilename);
+                const ext = format === 'jpg' ? 'jpg' : 'png';
+                triggerDownload(finalBlob, `${loadedOriginalFileName}_page${currentPageIndex + 1}.${ext}`);
+                showToast(`${ext.toUpperCase()} डाउनलोड हो गया`);
+                return;
+            }
+
+            // ZIP of all pages as JPG or PNG
+            if (format === 'zip-jpg' || format === 'zip-png') {
+                if (typeof JSZip === 'undefined') {
+                    alert('ZIP लाइब्रेरी लोड नहीं हुई। पेज रिफ्रेश करें।');
+                    return;
+                }
+                showToast("ZIP बना रहा है...");
+                const zip = new JSZip();
+                const imgExt = format === 'zip-jpg' ? 'jpg' : 'png';
+                const mime = format === 'zip-jpg' ? 'image/jpeg' : 'image/png';
+                const quality = format === 'zip-jpg' ? 0.92 : undefined;
+
+                for (let i = 0; i < pagesData.length; i++) {
+                    const canvas = await getFlattenedCanvasForPage(i);
+                    const dataUrl = canvas.toDataURL(mime, quality);
+                    const base64 = dataUrl.split(',')[1];
+                    const pageName = pagesData.length === 1 
+                        ? `${loadedOriginalFileName}.${imgExt}` 
+                        : `${loadedOriginalFileName}_page${String(i + 1).padStart(2, '0')}.${imgExt}`;
+                    zip.file(pageName, base64, { base64: true });
+                }
+
+                const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+                const finalBlob = isTargetSizeOn ? padBlobToTargetSize(zipBlob, targetBytes) : zipBlob;
+                triggerDownload(finalBlob, `${loadedOriginalFileName}_all_pages.zip`);
+                showToast(`${pagesData.length} पेज ZIP में डाउनलोड हो गए`);
                 return;
             }
 
@@ -2718,12 +2868,13 @@
                     } else {
                         pdf.addPage([canvas.width, canvas.height], canvas.width > canvas.height ? 'l' : 'p');
                     }
-                    pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, canvas.width, canvas.height);
+                    pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, canvas.width, canvas.height);
                 }
                 
                 const pdfBlob = pdf.output('blob');
                 const finalBlob = isTargetSizeOn ? padBlobToTargetSize(pdfBlob, targetBytes) : pdfBlob;
-                triggerDownload(finalBlob, exportFilename);
+                triggerDownload(finalBlob, `${loadedOriginalFileName}_edited.pdf`);
+                showToast("PDF डाउनलोड हो गया");
             }
         }
 
