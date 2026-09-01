@@ -294,9 +294,11 @@
         <span id="toastText">संदेश</span>
     </div>
 
-    <!-- MAIN APP HEADER -->
-    <header class="bg-white border-b border-slate-200 h-14 shrink-0 px-4 flex items-center justify-between z-40 shadow-sm">
-        <div class="flex items-center space-x-3">
+    <!-- MAIN APP HEADER (ENHANCED WITH DOWNLOAD & STRAIGHTEN/RESET TOOLS) -->
+    <header class="bg-white border-b border-slate-200 min-h-[56px] py-1.5 px-3 flex flex-wrap items-center justify-between gap-2 z-40 shadow-sm shrink-0">
+        
+        <!-- BRAND & TITLE -->
+        <div class="flex items-center space-x-2.5 shrink-0">
             <div class="bg-indigo-600 text-white w-8 h-8 rounded-lg shadow-md flex items-center justify-center">
                 <i class="fa-solid fa-layer-group text-sm"></i>
             </div>
@@ -306,24 +308,77 @@
             </div>
         </div>
 
-        <div class="flex items-center gap-1.5">
-            <button id="moveModeBtn" type="button" class="bg-slate-700 hover:bg-slate-800 text-white px-3 py-1.5 rounded-lg font-bold text-xs transition">
-                <i class="fa-solid fa-arrows-up-down-left-right"></i> Move
-            </button>
-            <button id="moveCutBtn" type="button" class="bg-rose-600 hover:bg-rose-700 text-white px-2.5 py-1.5 rounded-lg font-bold text-xs transition" title="Cut selected area">
-                <i class="fa-solid fa-scissors"></i> Cut
-            </button>
-            <button id="moveCopyBtn" type="button" class="bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1.5 rounded-lg font-bold text-xs transition" title="Copy selected area">
-                <i class="fa-regular fa-copy"></i> Copy
-            </button>
-            <button id="movePasteBtn" type="button" class="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1.5 rounded-lg font-bold text-xs transition" title="Paste selected area">
-                <i class="fa-solid fa-paste"></i> Paste
-            </button>
+        <!-- ACTIONS & TOOLS (Move + Straighten & Reset) -->
+        <div class="flex items-center gap-1.5 flex-wrap">
+            
+            <!-- MOVE TOOLBAR GROUP -->
+            <div class="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
+                <button id="moveModeBtn" type="button" class="bg-slate-700 hover:bg-slate-800 text-white px-2.5 py-1 rounded-md font-bold text-xs transition">
+                    <i class="fa-solid fa-arrows-up-down-left-right"></i> Move
+                </button>
+                <button id="moveCutBtn" type="button" class="bg-rose-600 hover:bg-rose-700 text-white px-2 py-1 rounded-md font-bold text-xs transition" title="Cut selected area">
+                    <i class="fa-solid fa-scissors"></i> Cut
+                </button>
+                <button id="moveCopyBtn" type="button" class="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded-md font-bold text-xs transition" title="Copy selected area">
+                    <i class="fa-regular fa-copy"></i> Copy
+                </button>
+                <button id="movePasteBtn" type="button" class="bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded-md font-bold text-xs transition" title="Paste selected area">
+                    <i class="fa-solid fa-paste"></i> Paste
+                </button>
+            </div>
+
+            <!-- STRAIGHTEN & RESET GROUP -->
+            <div class="flex items-center gap-1 bg-amber-50/80 p-1 rounded-lg border border-amber-200">
+                <button onmousedown="event.preventDefault()" onclick="startStraightenTool()" id="straightenBtn" class="bg-sky-600 hover:bg-sky-700 text-white px-2.5 py-1 rounded-md text-xs font-bold transition flex items-center gap-1" title="फोटो सीधा करें (Straighten)">
+                    <i class="fa-solid fa-crop-simple"></i> सीधा करें
+                </button>
+
+                <div id="straightenControls" class="hidden flex gap-1">
+                    <button onmousedown="event.preventDefault()" onclick="applyStraightenTool()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded-md text-xs font-extrabold shadow-sm">✓ लागू करें</button>
+                    <button onmousedown="event.preventDefault()" onclick="cancelStraightenTool()" class="bg-white text-slate-700 px-2 py-1 rounded-md text-xs font-bold border border-slate-300 shadow-sm">रद्द</button>
+                </div>
+
+                <button onmousedown="event.preventDefault()" onclick="reloadOriginalCanvasState()" class="bg-white hover:bg-red-50 text-red-600 px-2 py-1 rounded-md text-xs font-bold border border-red-200 transition flex items-center gap-1" title="कैनवास रीसेट करें">
+                    <i class="fa-solid fa-rotate-left"></i> रीसेट
+                </button>
+            </div>
         </div>
 
-        <div class="flex items-center gap-2">
-            <button onclick="triggerCleanPrint()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-1.5 rounded-lg font-bold text-xs shadow transition flex items-center gap-1.5">
-                <i class="fa-solid fa-print"></i> प्रिंट निकालें
+        <!-- EXPORT, TARGET SIZE & PRINT GROUP -->
+        <div class="flex items-center gap-1.5 flex-wrap shrink-0">
+            
+            <!-- TARGET SIZE LIMIT (COMPACT) -->
+            <div class="flex items-center gap-1.5 bg-slate-800 text-white px-2 py-1 rounded-lg border border-slate-700 text-xs shadow-sm">
+                <label class="flex items-center gap-1 cursor-pointer select-none text-[11px] font-bold text-slate-300">
+                    <input type="checkbox" id="targetSizeToggle" onchange="toggleTargetSizeState()" class="accent-pink-500 w-3.5 h-3.5 cursor-pointer">
+                    <span>Target Size</span>
+                </label>
+                <div id="targetInputs" class="flex items-center gap-1 opacity-40 pointer-events-none transition-all">
+                    <input type="number" id="targetSizeValue" value="5" class="w-11 bg-slate-900 border border-slate-600 rounded px-1 py-0.5 text-xs font-bold text-white text-center outline-none">
+                    <select id="targetSizeUnit" class="bg-slate-900 border border-slate-600 rounded px-1 py-0.5 text-xs font-bold text-white outline-none">
+                        <option value="KB">KB</option>
+                        <option value="MB" selected>MB</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- EXPORT SELECT & DOWNLOAD BUTTON -->
+            <div class="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
+                <select id="exportFormat" class="bg-white border border-slate-300 text-slate-800 rounded-md px-1.5 py-1 text-xs font-bold outline-none">
+                    <option value="pdf">PDF (.pdf)</option>
+                    <option value="jpg">JPG (.jpg)</option>
+                    <option value="png">PNG (.png)</option>
+                    <option value="txt">Text (.txt)</option>
+                </select>
+
+                <button onclick="processExport()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-2.5 py-1 rounded-md shadow-sm text-xs transition flex items-center gap-1">
+                    <i class="fa-solid fa-download"></i> डाउनलोड
+                </button>
+            </div>
+
+            <!-- PRINT BUTTON -->
+            <button onclick="triggerCleanPrint()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow transition flex items-center gap-1.5">
+                <i class="fa-solid fa-print"></i> प्रिंट
             </button>
         </div>
     </header>
@@ -492,24 +547,6 @@
                 </button>
             </div>
 
-            <!-- ADVANCED UTILITIES -->
-            <div class="bg-amber-50/80 border border-amber-200 rounded-xl p-2.5 shadow-sm space-y-1.5 shrink-0">
-                <div class="text-[11px] font-extrabold uppercase text-amber-800 tracking-wider">एडवांस टूल (Straighten & Reset)</div>
-                
-                <button onmousedown="event.preventDefault()" onclick="startStraightenTool()" id="straightenBtn" class="w-full bg-white hover:bg-sky-600 hover:text-white text-sky-900 py-1 rounded-lg text-xs font-extrabold border border-sky-300 transition flex items-center justify-center gap-1 shadow-sm">
-                    <i class="fa-solid fa-crop-simple text-sky-600"></i> फोटो सीधा करें (Straighten)
-                </button>
-
-                <div id="straightenControls" class="hidden flex gap-1.5">
-                    <button onmousedown="event.preventDefault()" onclick="applyStraightenTool()" class="flex-1 bg-sky-600 text-white py-1 rounded-lg text-xs font-extrabold shadow-sm">✓ सीधा करें</button>
-                    <button onmousedown="event.preventDefault()" onclick="cancelStraightenTool()" class="flex-1 bg-white text-slate-700 py-1 rounded-lg text-xs font-bold border border-slate-300 shadow-sm">रद्द</button>
-                </div>
-
-                <button onmousedown="event.preventDefault()" onclick="reloadOriginalCanvasState()" class="w-full bg-white hover:bg-red-50 text-red-600 py-1 rounded-lg text-xs font-bold border border-red-200 transition shadow-sm">
-                    कैनवास रीसेट करें
-                </button>
-            </div>
-
             <!-- BRIGHTNESS / CONTRAST -->
             <div class="bg-white border border-slate-200 rounded-xl p-2.5 shadow-sm space-y-1.5 shrink-0">
                 <div class="text-[11px] font-extrabold uppercase text-slate-500 tracking-wider">लाइटिंग (Lighting Controls)</div>
@@ -520,49 +557,6 @@
                 <div class="flex items-center gap-2">
                     <i class="fa-solid fa-circle-half-stroke text-indigo-600 text-xs"></i>
                     <input type="range" id="contrastRange" min="50" max="200" value="100" oninput="applyImageFilters()" class="w-full accent-indigo-600 cursor-pointer h-1 bg-slate-200 rounded">
-                </div>
-            </div>
-
-            <!-- EXPORT SECTION -->
-            <div class="bg-slate-900 border border-slate-800 rounded-xl p-2.5 space-y-2 mt-auto text-white shadow-md">
-                <div class="flex items-center justify-between">
-                    <label class="text-xs font-extrabold block text-slate-200"><i class="fa-solid fa-download text-indigo-400 mr-1"></i> एक्सपोर्ट व डाउनलोड</label>
-                </div>
-
-                <!-- TARGET FILE SIZE OPTION -->
-                <div class="border-t border-slate-700 pt-1.5">
-                    <div class="flex items-center justify-between mb-1">
-                        <span class="text-[10px] font-bold text-slate-300">Target Size Limit</span>
-                        <label class="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" id="targetSizeToggle" onchange="toggleTargetSizeState()" class="sr-only peer">
-                            <div class="w-7 h-3.5 bg-slate-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[1px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-pink-500"></div>
-                        </label>
-                    </div>
-
-                    <div id="targetInputs" class="grid grid-cols-3 gap-1 opacity-40 pointer-events-none transition-all">
-                        <div class="col-span-2">
-                            <input type="number" id="targetSizeValue" value="5" class="w-full bg-slate-800 border border-slate-700 rounded p-1 text-xs font-bold text-white">
-                        </div>
-                        <div>
-                            <select id="targetSizeUnit" class="w-full bg-slate-800 border border-slate-700 rounded p-1 text-xs font-bold text-white">
-                                <option value="KB">KB</option>
-                                <option value="MB" selected>MB</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="flex gap-1.5 pt-0.5">
-                    <select id="exportFormat" class="flex-1 bg-slate-800 border border-slate-700 text-white rounded-lg p-1 text-xs font-bold outline-none">
-                        <option value="pdf">PDF Document (.pdf)</option>
-                        <option value="jpg">JPG Image (.jpg)</option>
-                        <option value="png">PNG Image (.png)</option>
-                        <option value="txt">Text File (.txt - Full Extract)</option>
-                    </select>
-
-                    <button onclick="processExport()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold px-2.5 py-1 rounded-lg shadow text-xs transition">
-                        डाउनलोड
-                    </button>
                 </div>
             </div>
 
@@ -1904,7 +1898,6 @@
 
             masterCtx.save(); 
             if (feather > 0) {
-                // Soft Gaussian Blur offscreen blending
                 const pad = feather * 3;
                 const diameter = (radius + pad) * 2;
                 const off = document.createElement('canvas');
@@ -1945,7 +1938,6 @@
 
             masterCtx.save(); 
             if (feather > 0) {
-                // Ultra Smooth Gaussian Feather Blend
                 const pad = feather * 3;
                 const off = document.createElement('canvas');
                 off.width = w + pad * 2;
