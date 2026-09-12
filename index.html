@@ -564,15 +564,53 @@
                     <div class="border-t border-slate-100 pt-1">
                         <div class="flex justify-between items-center text-[10px] font-bold text-slate-700 mb-0.5">
                             <span>किनारे धुंधले व मिक्स करें (Blur Feather):</span>
-                            <span id="eraserFeatherVal" class="text-pink-600 font-extrabold">6px</span>
+                            <span id="eraserFeatherVal" class="text-pink-600 font-extrabold">10px</span>
                         </div>
-                        <input type="range" id="eraserFeatherRange" min="0" max="30" value="6" oninput="document.getElementById('eraserFeatherVal').innerText = this.value + 'px'" class="w-full accent-pink-600 cursor-pointer h-1 bg-slate-200 rounded">
+                        <input type="range" id="eraserFeatherRange" min="4" max="30" value="10" oninput="document.getElementById('eraserFeatherVal').innerText = this.value + 'px'" class="w-full accent-pink-600 cursor-pointer h-1 bg-slate-200 rounded">
                     </div>
                 </div>
 
                 <button onmousedown="event.preventDefault()" onclick="erasePrecisionSelection()" class="w-full bg-pink-100 hover:bg-pink-600 hover:text-white text-pink-900 py-1 rounded-lg text-[11px] font-extrabold border border-pink-200 transition shadow-sm">
                     चयनित गोलाकार भाग मिटाएँ
                 </button>
+                </div>
+            </div>
+
+            <!-- CLONE / STAMP TOOL (PHOTOSHOP-STYLE) -->
+            <div class="tool-panel open bg-violet-50/80 border border-violet-200 rounded-xl shadow-sm shrink-0">
+                <div class="tool-panel-header flex items-center justify-between px-2.5 py-2" onclick="this.parentElement.classList.toggle('open')">
+                    <div class="text-[11px] font-extrabold uppercase text-violet-700 tracking-wider"><i class="fa-solid fa-stamp"></i> स्टैंप टूल (Clean Erase)</div>
+                    <i class="fa-solid fa-chevron-down chevron text-violet-500 text-xs"></i>
+                </div>
+                <div class="tool-panel-body px-2.5 pb-2.5 space-y-2">
+                    <p class="text-[10px] text-violet-800 leading-snug bg-white p-1.5 rounded-lg border border-violet-100">
+                        1️⃣ पहले <b>Alt + Click</b> से साफ जगह (सोर्स) चुनें<br>
+                        2️⃣ फिर शब्द के ऊपर पेंट करें — बिल्कुल असली Photoshop स्टैंप टूल जैसे, बिना किसी बॉक्स के।
+                    </p>
+
+                    <button onmousedown="event.preventDefault()" id="stampToggleBtn" onclick="toggleStampTool()" class="w-full bg-white hover:bg-violet-600 text-slate-800 hover:text-white py-1 rounded-lg text-xs font-extrabold border border-violet-300 transition flex items-center justify-center gap-1 shadow-sm">
+                        <i class="fa-solid fa-stamp text-violet-500"></i> <span id="stampBtnText">स्टैंप टूल चालू करें</span>
+                    </button>
+
+                    <div class="space-y-0.5 bg-white p-1.5 rounded-lg border border-violet-100 shadow-sm">
+                        <div class="flex justify-between items-center text-[11px] font-bold text-violet-900">
+                            <span>ब्रश आकार (Brush Size):</span>
+                            <span id="stampSizeVal" class="font-extrabold">40px</span>
+                        </div>
+                        <input type="range" id="stampSizeRange" min="10" max="200" value="40" oninput="updateStampBrushSize()" class="w-full accent-violet-600 cursor-pointer h-1 bg-slate-200 rounded">
+                    </div>
+
+                    <div class="space-y-0.5 bg-white p-1.5 rounded-lg border border-violet-100 shadow-sm">
+                        <div class="flex justify-between items-center text-[11px] font-bold text-violet-900">
+                            <span>किनारे धुंधले करें (Softness):</span>
+                            <span id="stampSoftVal" class="font-extrabold">35%</span>
+                        </div>
+                        <input type="range" id="stampSoftRange" min="0" max="80" value="35" oninput="updateStampSoftness()" class="w-full accent-violet-600 cursor-pointer h-1 bg-slate-200 rounded">
+                    </div>
+
+                    <button onmousedown="event.preventDefault()" onclick="resetStampSource()" class="w-full bg-violet-100 hover:bg-violet-600 hover:text-white text-violet-900 py-1 rounded-lg text-[11px] font-extrabold border border-violet-200 transition shadow-sm">
+                        <i class="fa-solid fa-rotate"></i> नया सोर्स चुनें
+                    </button>
                 </div>
             </div>
 
@@ -640,6 +678,15 @@
         let eraserPreview = null;
         let precisionEraser = { active: false, center: null, radius: 25, handle: null };
         let straightenState = null;
+
+        // CLONE / STAMP TOOL STATE (Photoshop-style clean erase)
+        let isStampMode = false;
+        let stampSourcePoint = null;
+        let stampOffsetX = 0, stampOffsetY = 0;
+        let isStampPainting = false;
+        let stampBrushSize = 40;
+        let stampSoftness = 35;
+        let stampCursorPreview = null;
 
         let selectedTextElems = [];
         let selectedTextElem = null;
@@ -1266,6 +1313,7 @@
 
             deselectAllText();
             initDirectCanvasEraserListeners();
+            initStampCanvasListeners();
             initBoxSelectionEngine();
             applyZoomUI();
             
@@ -1923,7 +1971,7 @@
             
             const isAutoBg = document.getElementById('autoBgColorToggle').checked;
             const eraseColor = isAutoBg ? sampleAutoBgAtPos(center.x - radius - 2, center.y - radius - 2) : (document.getElementById('eraserColor').value || '#ffffff');
-            const feather = parseInt(document.getElementById('eraserFeatherRange').value) || 0;
+            const feather = Math.max(4, parseInt(document.getElementById('eraserFeatherRange').value) || 0);
 
             masterCtx.save(); 
             if (feather > 0) {
@@ -1963,7 +2011,7 @@
             
             const isAutoBg = document.getElementById('autoBgColorToggle').checked;
             const eraseColor = isAutoBg ? sampleAutoBgAtPos(x - 4, y - 4) : (document.getElementById('eraserColor').value || '#ffffff');
-            const feather = parseInt(document.getElementById('eraserFeatherRange').value) || 0;
+            const feather = Math.max(4, parseInt(document.getElementById('eraserFeatherRange').value) || 0);
 
             masterCtx.save(); 
             if (feather > 0) {
@@ -1993,6 +2041,154 @@
         }
 
         function removeEraserPreview() { if (eraserPreview) { eraserPreview.remove(); eraserPreview = null; } }
+
+        /* -------------------------------------------------------------
+           CLONE / STAMP TOOL — copies real pixels from a source point
+           with a soft round feathered brush, so erased words blend in
+           perfectly instead of leaving a flat box-color patch.
+        ------------------------------------------------------------- */
+        function toggleStampTool() {
+            commitActivePastedObject();
+            isStampMode = !isStampMode;
+            const btn = document.getElementById('stampToggleBtn');
+            const txt = document.getElementById('stampBtnText');
+            const canvasContainer = document.getElementById('fullScreenCanvasContainer');
+
+            if (isStampMode) {
+                if (isEraserMode) toggleEraserTool();
+                deselectAllText();
+                stampSourcePoint = null;
+                btn.className = "w-full bg-violet-600 text-white py-1 rounded-lg text-xs font-extrabold border border-violet-600 shadow-sm";
+                txt.innerText = "सोर्स चुनें (Alt+Click)";
+                if (masterCanvas) masterCanvas.classList.add('eraser-active');
+                if (canvasContainer) canvasContainer.classList.add('eraser-mode-active');
+            } else {
+                btn.className = "w-full bg-white hover:bg-violet-600 text-slate-800 hover:text-white py-1 rounded-lg text-xs font-extrabold border border-violet-300 shadow-sm";
+                txt.innerText = "स्टैंप टूल चालू करें";
+                stampSourcePoint = null;
+                isStampPainting = false;
+                removeStampCursorPreview();
+                if (masterCanvas) masterCanvas.classList.remove('eraser-active');
+                if (canvasContainer) canvasContainer.classList.remove('eraser-mode-active');
+            }
+        }
+
+        function resetStampSource() {
+            stampSourcePoint = null;
+            if (document.getElementById('stampBtnText')) {
+                document.getElementById('stampBtnText').innerText = isStampMode ? "सोर्स चुनें (Alt+Click)" : "स्टैंप टूल चालू करें";
+            }
+            showToast('नया सोर्स चुनें — Alt+Click करें');
+        }
+
+        function updateStampBrushSize() {
+            stampBrushSize = parseInt(document.getElementById('stampSizeRange').value) || 40;
+            document.getElementById('stampSizeVal').innerText = `${stampBrushSize}px`;
+        }
+
+        function updateStampSoftness() {
+            stampSoftness = parseInt(document.getElementById('stampSoftRange').value) || 0;
+            document.getElementById('stampSoftVal').innerText = `${stampSoftness}%`;
+        }
+
+        function initStampCanvasListeners() {
+            if (!masterCanvas) return;
+            masterCanvas.addEventListener('mousedown', function(e) {
+                if (!isStampMode || isSpacePressed) return;
+                const pos = getCanvasNativeCoordinates(e.clientX, e.clientY);
+
+                if (e.altKey || !stampSourcePoint) {
+                    stampSourcePoint = pos;
+                    if (document.getElementById('stampBtnText')) {
+                        document.getElementById('stampBtnText').innerText = "सोर्स सेट ✓ — अब पेंट करें";
+                    }
+                    showToast('स्टैंप सोर्स सेट हो गया');
+                    return;
+                }
+
+                isStampPainting = true;
+                stampOffsetX = pos.x - stampSourcePoint.x;
+                stampOffsetY = pos.y - stampSourcePoint.y;
+                saveUndoState();
+                paintStampAt(pos);
+            });
+        }
+
+        window.addEventListener('mousemove', (e) => {
+            if (isStampMode && masterCanvas) {
+                const pos = getCanvasNativeCoordinates(e.clientX, e.clientY);
+                updateStampCursorPreview(pos);
+                if (isStampPainting) paintStampAt(pos);
+            }
+        });
+
+        window.addEventListener('mouseup', () => {
+            if (isStampMode && isStampPainting) {
+                isStampPainting = false;
+                document.querySelectorAll('.seamless-text-item').forEach(el => {
+                    // leave text items alone — stamp only affects the base image layer
+                });
+                saveCurrentPageInMemory();
+            }
+        });
+
+        function paintStampAt(pos) {
+            if (!stampSourcePoint || !masterCanvas) return;
+            const srcX = pos.x - stampOffsetX;
+            const srcY = pos.y - stampOffsetY;
+            const r = stampBrushSize / 2;
+            const feather = Math.max(0, Math.min(r - 1, r * (stampSoftness / 100)));
+            const size = Math.ceil(r * 2);
+
+            // grab the source pixels
+            const off = document.createElement('canvas');
+            off.width = size; off.height = size;
+            const octx = off.getContext('2d');
+            octx.drawImage(masterCanvas, srcX - r, srcY - r, size, size, 0, 0, size, size);
+
+            // soft round feather mask so the edge blends seamlessly (no box look)
+            const maskCanvas = document.createElement('canvas');
+            maskCanvas.width = size; maskCanvas.height = size;
+            const mctx = maskCanvas.getContext('2d');
+            const grad = mctx.createRadialGradient(size / 2, size / 2, Math.max(0, r - feather), size / 2, size / 2, r);
+            grad.addColorStop(0, 'rgba(255,255,255,1)');
+            grad.addColorStop(1, 'rgba(255,255,255,0)');
+            mctx.fillStyle = grad;
+            mctx.beginPath();
+            mctx.arc(size / 2, size / 2, r, 0, Math.PI * 2);
+            mctx.fill();
+
+            octx.globalCompositeOperation = 'destination-in';
+            octx.drawImage(maskCanvas, 0, 0);
+
+            masterCtx.drawImage(off, pos.x - r, pos.y - r);
+        }
+
+        function updateStampCursorPreview(pos) {
+            if (!masterCanvas) return;
+            if (!stampCursorPreview) {
+                stampCursorPreview = document.createElement('div');
+                stampCursorPreview.className = 'editor-eraser-preview';
+                stampCursorPreview.style.background = 'rgba(139, 92, 246, 0.18)';
+                stampCursorPreview.style.border = '2px dashed rgba(124, 58, 237, 1)';
+                stampCursorPreview.style.borderRadius = '50%';
+                document.getElementById('fullScreenCanvasContainer').appendChild(stampCursorPreview);
+            }
+            const r = stampBrushSize / 2;
+            const pctX = ((pos.x - r) / masterCanvas.width) * 100;
+            const pctY = ((pos.y - r) / masterCanvas.height) * 100;
+            const pctW = (stampBrushSize / masterCanvas.width) * 100;
+            const pctH = (stampBrushSize / masterCanvas.height) * 100;
+            stampCursorPreview.style.left = `${pctX}%`;
+            stampCursorPreview.style.top = `${pctY}%`;
+            stampCursorPreview.style.width = `${pctW}%`;
+            stampCursorPreview.style.height = `${pctH}%`;
+            stampCursorPreview.style.display = isStampMode ? 'block' : 'none';
+        }
+
+        function removeStampCursorPreview() {
+            if (stampCursorPreview) { stampCursorPreview.remove(); stampCursorPreview = null; }
+        }
 
         function applyZoomUI() {
             const container = document.getElementById('fullScreenCanvasContainer');
