@@ -64,6 +64,18 @@
             margin: auto !important;
         }
 
+        /* OVERLAYS MUST NOT BLOCK MOUSE IN ERASER / STAMP / MOVE MODES */
+        #fullScreenCanvasContainer.eraser-mode-active .pdf-text-layer,
+        #fullScreenCanvasContainer.eraser-mode-active .ocr-text-layer,
+        #fullScreenCanvasContainer.eraser-mode-active .seamless-text-item,
+        #fullScreenCanvasContainer.stamp-mode-active .pdf-text-layer,
+        #fullScreenCanvasContainer.stamp-mode-active .ocr-text-layer,
+        #fullScreenCanvasContainer.stamp-mode-active .seamless-text-item,
+        #fullScreenCanvasContainer.move-mode-active .pdf-text-layer,
+        #fullScreenCanvasContainer.move-mode-active .ocr-text-layer {
+            pointer-events: none !important;
+        }
+
         /* TEXT LAYERS */
         .pdf-text-layer {
             position: absolute; inset: 0; z-index: 45; pointer-events: none;
@@ -101,6 +113,7 @@
             outline: none !important; background: transparent !important; 
             z-index: 100 !important;
         }
+
         /* Rotation handle */
         .text-rotate-handle, .paste-rotate-handle {
             position: absolute;
@@ -202,7 +215,7 @@
         .panning-active { cursor: grabbing !important; }
         .editor-eraser-preview { 
             position: absolute; z-index: 99999 !important; pointer-events: none !important; 
-            box-sizing: border-box; background: rgba(236, 72, 153, 0.25); border: 2px dashed #db2777; 
+            box-sizing: border-box; background: rgba(236, 72, 153, 0.22); border: 1.5px dashed #db2777; 
         }
 
         #floatingPastedElement {
@@ -366,7 +379,7 @@
                 <i class="fa-solid fa-stamp"></i>
             </button>
 
-            <button id="toolEraser" onclick="selectPsTool('eraser')" class="ps-tool-btn" title="Eraser Tool (E)">
+            <button id="toolEraser" onclick="selectPsTool('eraser')" class="ps-tool-btn" title="Eraser Tool (E) - रबर टूल">
                 <i class="fa-solid fa-eraser"></i>
             </button>
 
@@ -415,20 +428,21 @@
         let currentZoom = 1.0;
 
         let activePsTool = 'text';
-        let isEraserMode = false;
-        let isErasing = false;
-        
         let masterCanvas = null;
         let masterCtx = null;
-        
+
+        /* ========== UPGRADED ERASER ENGINE VARIABLES ========== */
+        let isEraserMode = false;
+        let isErasing = false;
+        let eraserType = 'brush'; // 'brush' (फ्रीहैंड ब्रश) or 'box' (आयत/बॉक्स)
         let eraserBrushSize = 25;
-        let eraserOpacity = 100;
-        let eraserShape = 'rect';
+        let eraserShape = 'circle'; // 'circle' or 'rect'
         let eraserStart = null;
+        let eraserLastPos = null;
         let eraserPreview = null;
         let magicEraserMode = false;
-        let magicEraserTolerance = 40;
-        let straightenState = null;
+        let magicEraserTolerance = 45;
+        let liveEraserCursorElem = null;
 
         // Stamp tool
         let isStampMode = false;
@@ -438,6 +452,7 @@
         let stampBrushSize = 40;
         let stampSoftness = 35;
         let stampCursorPreview = null;
+        let straightenState = null;
 
         let selectedTextElems = [];
         let selectedTextElem = null;
@@ -509,6 +524,12 @@
             }
         }
 
+        function setEraserType(type) {
+            eraserType = type;
+            renderTopOptionsBar('eraser');
+            showToast(type === 'brush' ? "ब्रश रबर: माउस दबाकर फेरें और मिटाएँ" : "बॉक्स रबर: माउस से आयत खींचकर पूरा एरिया मिटाएँ");
+        }
+
         function renderTopOptionsBar(tool) {
             const group = document.getElementById('activeToolSettingsGroup');
             if (!group) return;
@@ -572,29 +593,45 @@
             } else if (tool === 'eraser') {
                 group.innerHTML = `
                     <span class="text-pink-400 font-bold flex items-center gap-1"><i class="fa-solid fa-eraser"></i> Eraser:</span>
-                    <label class="flex items-center gap-1.5 text-[11px] font-bold cursor-pointer px-2 py-0.5 rounded border ${magicEraserMode ? 'bg-amber-600/40 border-amber-400 text-amber-200' : 'bg-slate-800 border-slate-600 text-slate-300'}" title="सिर्फ चुने रंग को मिटाए">
+                    
+                    <!-- MODE SELECTOR: BRUSH vs BOX -->
+                    <div class="flex items-center bg-[#181a1f] p-0.5 rounded border border-slate-700">
+                        <button onclick="setEraserType('brush')" class="px-2 py-0.5 rounded text-[10px] font-bold transition ${eraserType === 'brush' ? 'bg-pink-600 text-white shadow' : 'text-slate-400 hover:text-white'}">
+                            <i class="fa-solid fa-paintbrush mr-1"></i>ब्रश
+                        </button>
+                        <button onclick="setEraserType('box')" class="px-2 py-0.5 rounded text-[10px] font-bold transition ${eraserType === 'box' ? 'bg-pink-600 text-white shadow' : 'text-slate-400 hover:text-white'}">
+                            <i class="fa-regular fa-square mr-1"></i>बॉक्स
+                        </button>
+                    </div>
+
+                    <!-- MAGIC ERASER TOGGLE -->
+                    <label class="flex items-center gap-1.5 text-[11px] font-bold cursor-pointer px-2 py-0.5 rounded border transition ${magicEraserMode ? 'bg-amber-600/40 border-amber-400 text-amber-200 shadow' : 'bg-slate-800 border-slate-600 text-slate-300'}" title="क्लिक करें और सिर्फ लिखावट मिटाएं (कागज़ नहीं कटेगा)">
                         <input type="checkbox" id="magicEraserToggle" ${magicEraserMode ? 'checked' : ''} onchange="toggleMagicEraser(this.checked)" class="accent-amber-500 w-3.5 h-3.5 cursor-pointer">
                         <i class="fa-solid fa-wand-magic-sparkles"></i> Magic
                     </label>
+
                     <div class="flex items-center gap-1 bg-[#181a1f] px-1.5 py-0.5 rounded border border-slate-700">
                         <span class="text-[10px] text-slate-400">Tol:</span>
                         <input type="range" id="magicTolRange" min="5" max="100" value="${magicEraserTolerance}" oninput="updateMagicTolerance(this.value)" class="w-14 accent-amber-500 h-1 cursor-pointer">
                         <span id="magicTolVal" class="font-bold text-[10px] text-amber-400 min-w-[20px]">${magicEraserTolerance}</span>
                     </div>
+
                     <div class="h-4 w-[1px] bg-slate-700"></div>
+
                     <div class="flex items-center gap-1 bg-[#181a1f] px-1.5 py-0.5 rounded border border-slate-700">
                         <span class="text-[10px] text-slate-400">Size:</span>
-                        <input type="range" id="eraserSizeRange" min="5" max="200" value="${eraserBrushSize}" oninput="updateEraserBrushSize()" class="w-16 accent-pink-500 h-1 cursor-pointer">
-                        <span id="eraserSizeVal" class="font-bold text-[10px] text-pink-400 min-w-[28px]">${eraserBrushSize}px</span>
+                        <input type="range" id="eraserSizeRange" min="5" max="150" value="${eraserBrushSize}" oninput="updateEraserBrushSize()" class="w-16 accent-pink-500 h-1 cursor-pointer">
+                        <span id="eraserSizeVal" class="font-bold text-[10px] text-pink-400 min-w-[26px]">${eraserBrushSize}px</span>
                     </div>
+
                     <div class="flex items-center gap-1">
-                        <button onclick="setEraserShape('rect')" class="px-1.5 py-0.5 rounded text-[10px] font-bold ${eraserShape === 'rect' ? 'bg-pink-600 text-white' : 'bg-slate-700 text-slate-300'}">▭</button>
-                        <button onclick="setEraserShape('circle')" class="px-1.5 py-0.5 rounded text-[10px] font-bold ${eraserShape === 'circle' ? 'bg-pink-600 text-white' : 'bg-slate-700 text-slate-300'}">◯</button>
+                        <button onclick="setEraserShape('circle')" class="px-1.5 py-0.5 rounded text-[10px] font-bold ${eraserShape === 'circle' ? 'bg-pink-600 text-white' : 'bg-slate-700 text-slate-300'}">◯ गोल</button>
+                        <button onclick="setEraserShape('rect')" class="px-1.5 py-0.5 rounded text-[10px] font-bold ${eraserShape === 'rect' ? 'bg-pink-600 text-white' : 'bg-slate-700 text-slate-300'}">▭ चौकोर</button>
                     </div>
-                    <label class="flex items-center gap-1 text-[11px] text-slate-300 cursor-pointer">
-                        <input type="checkbox" id="autoBgColorToggle" checked class="accent-pink-600 w-3 h-3"> Paper
+
+                    <label class="flex items-center gap-1 text-[11px] text-slate-300 cursor-pointer ml-1" title="कागज़ के रंग से ऑटोमैटिक मिलाएँ">
+                        <input type="checkbox" id="autoBgColorToggle" checked class="accent-pink-600 w-3 h-3"> Auto Paper
                     </label>
-                    <span class="text-[10px] text-amber-300/90">🎯 Magic: Background Swatch में वो रंग रखें जो मिटाना है</span>
                 `;
             } else if (tool === 'stamp') {
                 group.innerHTML = `
@@ -1051,7 +1088,8 @@
             updateMultiPageControlsUI();
 
             const container = document.getElementById('fullScreenCanvasContainer');
-            document.querySelectorAll('.seamless-text-item, .pdf-text-layer, .ocr-text-layer, .text-rotate-handle').forEach(el => el.remove());
+            document.querySelectorAll('.seamless-text-item, .pdf-text-layer, .ocr-text-layer, .text-rotate-handle, #liveEraserCursor').forEach(el => el.remove());
+            liveEraserCursorElem = null;
 
             const pageObj = pagesData[currentPageIndex];
             const displayW = 800;
@@ -1383,7 +1421,6 @@
             const container = document.getElementById('fullScreenCanvasContainer');
             if (!container) return;
 
-            // FIX: जब Stamp या Eraser एक्टिव हो तो कभी भी डबल क्लिक से Text Mode नहीं खुलेगा
             container.ondblclick = function(e) {
                 if (isEraserMode || isStampMode || isSpacePressed || moveMode || activePsTool !== 'text') return;
                 e.preventDefault();
@@ -1732,7 +1769,9 @@
             snapshot.texts.forEach(item => createSeamlessWordStyleText(item.canvasX, item.canvasY, item.text, item, false, false));
         }
 
-        /* ERASER ENGINE */
+        /* ========================================================
+           COMPLETELY RE-ENGINEERED ERASER (रबर) & MAGIC ERASER
+           ======================================================== */
         function setEraserShape(shape) {
             eraserShape = shape;
             renderTopOptionsBar('eraser');
@@ -1744,12 +1783,22 @@
 
             if (isEraserMode) {
                 deselectAllText();
-                if (masterCanvas) masterCanvas.classList.add('eraser-active');
-                if (canvasContainer) canvasContainer.classList.add('eraser-mode-active');
+                if (canvasContainer) {
+                    canvasContainer.classList.add('eraser-mode-active');
+                }
+                if (masterCanvas) {
+                    masterCanvas.classList.add('eraser-active');
+                }
+                showToast(magicEraserMode ? "Magic Eraser Active: स्याही पर क्लिक या ड्रैग करें" : "Eraser Active: मिटाने के लिए ड्रैग करें");
             } else {
-                if (masterCanvas) masterCanvas.classList.remove('eraser-active');
-                if (canvasContainer) canvasContainer.classList.remove('eraser-mode-active');
+                if (canvasContainer) {
+                    canvasContainer.classList.remove('eraser-mode-active');
+                }
+                if (masterCanvas) {
+                    masterCanvas.classList.remove('eraser-active');
+                }
                 removeEraserPreview();
+                hideLiveEraserCursor();
             }
             if (activePastedElem) {
                 activePastedElem.style.pointerEvents = 'auto';
@@ -1765,113 +1814,16 @@
             if (val) val.innerText = `${eraserBrushSize}px`;
         }
 
-        function updateEraserOpacity() {
-            const range = document.getElementById('eraserOpacityRange');
-            if (!range) return;
-            eraserOpacity = parseInt(range.value) || 100;
-            const val = document.getElementById('eraserOpacityVal');
-            if (val) val.innerText = `${eraserOpacity}%`;
-        }
-
-        function initDirectCanvasEraserListeners() {
-            if (!masterCanvas) return;
-            masterCanvas.onmousedown = function(e) {
-                if (!isEraserMode || isSpacePressed || e.button !== 0) return;
-                isErasing = true;
-                const pos = getCanvasNativeCoordinates(e.clientX, e.clientY);
-                eraserStart = pos;
-                removeEraserPreview();
-                eraserPreview = document.createElement('div');
-                eraserPreview.className = 'editor-eraser-preview';
-                document.getElementById('fullScreenCanvasContainer').appendChild(eraserPreview);
-                updateEraserPreviewDOM(pos);
-            };
-        }
-
-        function updateEraserPreviewDOM(pNative) {
-            if (!eraserPreview || !eraserStart || !masterCanvas) return;
-            const pctStartX = (eraserStart.x / masterCanvas.width) * 100;
-            const pctStartY = (eraserStart.y / masterCanvas.height) * 100;
-            const pctPx = (pNative.x / masterCanvas.width) * 100;
-            const pctPy = (pNative.y / masterCanvas.height) * 100;
-
-            const leftPct = Math.min(pctStartX, pctPx);
-            const topPct = Math.min(pctStartY, pctPy);
-            const widthPct = Math.max((eraserBrushSize / masterCanvas.width) * 100, Math.abs(pctPx - pctStartX));
-            const heightPct = Math.max((eraserBrushSize / masterCanvas.height) * 100, Math.abs(pctPy - pctStartY));
-
-            eraserPreview.style.left = `${leftPct}%`; 
-            eraserPreview.style.top = `${topPct}%`;
-            eraserPreview.style.width = `${widthPct}%`; 
-            eraserPreview.style.height = `${heightPct}%`;
-            eraserPreview.style.borderRadius = eraserShape === 'circle' ? '50%' : '0';
-        }
-
-        window.addEventListener('mousemove', (e) => {
-            if (isEraserMode && isErasing && masterCanvas) {
-                updateEraserPreviewDOM(getCanvasNativeCoordinates(e.clientX, e.clientY));
-            }
-        });
-
-        window.addEventListener('mouseup', (e) => {
-            if (!isEraserMode || !isErasing || !masterCanvas) return;
-            isErasing = false;
-            const pos = getCanvasNativeCoordinates(e.clientX, e.clientY);
-
-            const minX = Math.min(eraserStart.x, pos.x);
-            const minY = Math.min(eraserStart.y, pos.y);
-            const w = Math.max(eraserBrushSize, Math.abs(pos.x - eraserStart.x));
-            const h = Math.max(eraserBrushSize, Math.abs(pos.y - eraserStart.y));
-
-            eraseRectSelection(minX, minY, w, h);
-            removeEraserPreview();
-            eraserStart = null;
-        });
-
-        /**
-         * स्मार्ट पेपर बैकग्राउंड सैंपलर (Paper Color Auto Detector)
-         */
-        function getSurroundingPaperColor(x, y, w, h) {
-            if (!masterCtx || !masterCanvas) return '#ffffff';
-            try {
-                const sx = Math.max(0, Math.floor(x - 6));
-                const sy = Math.max(0, Math.floor(y - 6));
-                const sw = Math.min(masterCanvas.width - sx, Math.ceil(w + 12));
-                const sh = Math.min(masterCanvas.height - sy, Math.ceil(h + 12));
-                const imgData = masterCtx.getImageData(sx, sy, sw, sh).data;
-                
-                let rTotal = 0, gTotal = 0, bTotal = 0, count = 0;
-                for (let py = 0; py < sh; py++) {
-                    for (let px = 0; px < sw; px++) {
-                        const isBorder = (py < 4 || py >= sh - 4 || px < 4 || px >= sw - 4);
-                        if (isBorder) {
-                            const idx = (py * sw + px) * 4;
-                            const r = imgData[idx], g = imgData[idx + 1], b = imgData[idx + 2];
-                            // केवल कागज़ के हल्के हिस्से को गिने (काली स्याही को नहीं)
-                            if ((r + g + b) / 3 > 110) {
-                                rTotal += r; gTotal += g; bTotal += b;
-                                count++;
-                            }
-                        }
-                    }
-                }
-                if (count > 0) {
-                    return `rgb(${Math.round(rTotal / count)}, ${Math.round(gTotal / count)}, ${Math.round(bTotal / count)})`;
-                }
-            } catch(e) {}
-            return '#ffffff';
-        }
-
         function toggleMagicEraser(on) {
             magicEraserMode = !!on;
             renderTopOptionsBar('eraser');
             showToast(magicEraserMode
-                ? "Magic ON: Background Color बॉक्स में सेट किया गया रंग ही मिटेगा"
+                ? "Magic ON: स्याही पर क्लिक करें, सिर्फ लिखावट साफ़ होगी (कागज़ सेफ रहेगा)"
                 : "Normal Eraser Mode Active");
         }
 
         function updateMagicTolerance(val) {
-            magicEraserTolerance = parseInt(val) || 40;
+            magicEraserTolerance = parseInt(val) || 45;
             const el = document.getElementById('magicTolVal');
             if (el) el.innerText = String(magicEraserTolerance);
         }
@@ -1893,80 +1845,137 @@
             return { r, g, b };
         }
 
+        function rgbToHex(r, g, b) {
+            return "#" + [r, g, b].map(x => {
+                const hex = Math.max(0, Math.min(255, Math.round(x))).toString(16);
+                return hex.length === 1 ? "0" + hex : hex;
+            }).join("");
+        }
+
         function colorDistance(r1, g1, b1, r2, g2, b2) {
             const dr = r1 - r2, dg = g1 - g2, db = b1 - b2;
             return Math.sqrt(dr*dr + dg*dg + db*db);
         }
 
-        /* 
-           FIXED MAGIC ERASER ENGINE 
-           - बार-बार लगातार कॉल करने पर भी बिना रुके ठीक वही रंग मिटाएगा 
-           - सिलेक्टेड रंग के पिक्सल को बैकग्राउंड के पेपर कलर से भर देगा 
-        */
-        function eraseRectSelection(x, y, w, h) {
-            if (!masterCtx || !masterCanvas || w < 1 || h < 1) return;
-            saveUndoState();
+        /**
+         * अल्ट्रा-फास्ट और परफेक्ट सराउंडिंग पेपर कलर डिटेक्टर
+         */
+        function getSurroundingPaperColor(x, y, w, h) {
+            if (!masterCtx || !masterCanvas) return '#ffffff';
+            try {
+                const pad = Math.max(12, Math.round(Math.max(w, h) * 0.2));
+                const sx = Math.max(0, Math.floor(x - pad));
+                const sy = Math.max(0, Math.floor(y - pad));
+                const sw = Math.min(masterCanvas.width - sx, Math.ceil(w + pad * 2));
+                const sh = Math.min(masterCanvas.height - sy, Math.ceil(h + pad * 2));
+                if (sw < 2 || sh < 2) return '#ffffff';
 
-            const autoToggle = document.getElementById('autoBgColorToggle');
-            const isAutoBg = !autoToggle || autoToggle.checked;
-            
-            // पेपर का बैकग्राउंड रंग
-            let paperFillColor = isAutoBg ? getSurroundingPaperColor(x, y, w, h) : '#ffffff';
-            const paperRGB = parseColorToRGB(paperFillColor);
+                const imgData = masterCtx.getImageData(sx, sy, sw, sh).data;
+                let maxLum = 0;
 
-            const rx = Math.max(0, Math.floor(x));
-            const ry = Math.max(0, Math.floor(y));
-            const rw = Math.min(masterCanvas.width - rx, Math.ceil(w));
-            const rh = Math.min(masterCanvas.height - ry, Math.ceil(h));
-            if (rw < 1 || rh < 1) return;
+                // पहला पास: किनारों पर सबसे चमकीला (असली कागज़) स्तर ढूंढें
+                for (let py = 0; py < sh; py++) {
+                    for (let px = 0; px < sw; px++) {
+                        const isBorder = (py < 4 || py >= sh - 4 || px < 4 || px >= sw - 4);
+                        if (!isBorder) continue;
+                        const idx = (py * sw + px) * 4;
+                        const lum = (imgData[idx] + imgData[idx + 1] + imgData[idx + 2]) / 3;
+                        if (lum > maxLum) maxLum = lum;
+                    }
+                }
 
-            if (magicEraserMode) {
-                // Background Swatch में चयनित रंग को मिटाया जाएगा
-                const targetColorHex = document.getElementById('eraserColor')?.value || '#000000';
-                const targetRGB = parseColorToRGB(targetColorHex);
-                const tol = Math.max(5, magicEraserTolerance || 40);
+                if (maxLum < 100) return '#ffffff';
 
-                const imgData = masterCtx.getImageData(rx, ry, rw, rh);
-                const d = imgData.data;
-                const isCircle = eraserShape === 'circle';
-                const cx = (x - rx) + w / 2;
-                const cy = (y - ry) + h / 2;
-                const rad = Math.max(w, h) / 2;
+                // दूसरा पास: सिर्फ उन्हीं पिक्सेल का औसत निकालें जो स्याही नहीं बल्कि कागज़ हैं
+                const lumFloor = Math.max(100, maxLum - 30);
+                let rSum = 0, gSum = 0, bSum = 0, count = 0;
 
-                let wipedCount = 0;
-                for (let py = 0; py < rh; py++) {
-                    for (let px = 0; px < rw; px++) {
-                        if (isCircle) {
-                            if (Math.hypot(px + 0.5 - cx, py + 0.5 - cy) > rad) continue;
-                        }
-                        const i = (py * rw + px) * 4;
-                        const pr = d[i], pg = d[i+1], pb = d[i+2];
-                        const dist = colorDistance(pr, pg, pb, targetRGB.r, targetRGB.g, targetRGB.b);
-
-                        // सिर्फ वही पिक्सल बदलें जो लक्ष्य रंग के बराबर या टॉलरेंस के अंदर हों
-                        if (dist <= tol) {
-                            d[i]     = paperRGB.r;
-                            d[i + 1] = paperRGB.g;
-                            d[i + 2] = paperRGB.b;
-                            d[i + 3] = 255; // पूर्ण अपारदर्शी पेपर
-                            wipedCount++;
+                for (let py = 0; py < sh; py++) {
+                    for (let px = 0; px < sw; px++) {
+                        const isBorder = (py < 4 || py >= sh - 4 || px < 4 || px >= sw - 4);
+                        if (!isBorder) continue;
+                        const idx = (py * sw + px) * 4;
+                        const r = imgData[idx], g = imgData[idx + 1], b = imgData[idx + 2];
+                        const lum = (r + g + b) / 3;
+                        if (lum >= lumFloor) {
+                            rSum += r; gSum += g; bSum += b;
+                            count++;
                         }
                     }
                 }
-                masterCtx.putImageData(imgData, rx, ry);
-                if (wipedCount > 0) {
-                    showToast("Magic Erase: चयनित रंग साफ़ किया गया");
+
+                if (count > 0) {
+                    return `rgb(${Math.round(rSum / count)}, ${Math.round(gSum / count)}, ${Math.round(bSum / count)})`;
                 }
+            } catch(e) {}
+            return '#ffffff';
+        }
+
+        /* 1. फ्रीहैंड ब्रश से मिटाना (Freehand Brush Stroke) */
+        function eraseBrushAt(pos, lastPos) {
+            if (!masterCtx || !masterCanvas) return;
+            const r = Math.max(2, Math.round(eraserBrushSize / 2));
+            const autoToggle = document.getElementById('autoBgColorToggle');
+            const isAutoBg = !autoToggle || autoToggle.checked;
+            const manualColor = document.getElementById('eraserColor')?.value || '#ffffff';
+            const paperFillColor = isAutoBg ? getSurroundingPaperColor(pos.x - r, pos.y - r, eraserBrushSize, eraserBrushSize) : manualColor;
+            const paperRGB = parseColorToRGB(paperFillColor);
+
+            if (magicEraserMode) {
+                // मैजिक ब्रश: सिर्फ टारगेट स्याही मिटाए
+                const targetColorHex = document.getElementById('eraserColor')?.value || '#000000';
+                const targetRGB = parseColorToRGB(targetColorHex);
+                const tol = Math.max(5, magicEraserTolerance || 45);
+
+                const bx = Math.max(0, Math.floor(pos.x - r));
+                const by = Math.max(0, Math.floor(pos.y - r));
+                const bw = Math.min(masterCanvas.width - bx, Math.ceil(eraserBrushSize));
+                const bh = Math.min(masterCanvas.height - by, Math.ceil(eraserBrushSize));
+                if (bw < 1 || bh < 1) return;
+
+                const imgData = masterCtx.getImageData(bx, by, bw, bh);
+                const d = imgData.data;
+                const isCircle = eraserShape === 'circle';
+
+                for (let py = 0; py < bh; py++) {
+                    for (let px = 0; px < bw; px++) {
+                        if (isCircle && Math.hypot(px - bw / 2, py - bh / 2) > r) continue;
+                        const i = (py * bw + px) * 4;
+                        const pr = d[i], pg = d[i + 1], pb = d[i + 2];
+                        const distTarget = colorDistance(pr, pg, pb, targetRGB.r, targetRGB.g, targetRGB.b);
+                        const distPaper = colorDistance(pr, pg, pb, paperRGB.r, paperRGB.g, paperRGB.b);
+
+                        if (distTarget <= tol || (distTarget < distPaper && distTarget <= tol * 1.6)) {
+                            d[i]     = paperRGB.r;
+                            d[i + 1] = paperRGB.g;
+                            d[i + 2] = paperRGB.b;
+                            d[i + 3] = 255;
+                        }
+                    }
+                }
+                masterCtx.putImageData(imgData, bx, by);
             } else {
-                // NORMAL ERASER: पूरे एरिया को पेपर कलर से भरे
+                // सिंपल क्लीन रबर ब्रश
                 masterCtx.save();
                 masterCtx.fillStyle = paperFillColor;
+                masterCtx.strokeStyle = paperFillColor;
+                masterCtx.lineWidth = eraserBrushSize;
+                masterCtx.lineCap = eraserShape === 'circle' ? 'round' : 'square';
+                masterCtx.lineJoin = eraserShape === 'circle' ? 'round' : 'miter';
+
+                if (lastPos) {
+                    masterCtx.beginPath();
+                    masterCtx.moveTo(lastPos.x, lastPos.y);
+                    masterCtx.lineTo(pos.x, pos.y);
+                    masterCtx.stroke();
+                }
+
                 if (eraserShape === 'circle') {
                     masterCtx.beginPath();
-                    masterCtx.arc(x + w / 2, y + h / 2, Math.max(w, h) / 2, 0, Math.PI * 2);
+                    masterCtx.arc(pos.x, pos.y, r, 0, Math.PI * 2);
                     masterCtx.fill();
                 } else {
-                    masterCtx.fillRect(x, y, w, h);
+                    masterCtx.fillRect(pos.x - r, pos.y - r, eraserBrushSize, eraserBrushSize);
                 }
                 masterCtx.restore();
             }
@@ -1975,15 +1984,234 @@
             document.querySelectorAll('.seamless-text-item').forEach(el => {
                 const lx = parseFloat(el.dataset.canvasX) || 0;
                 const ly = parseFloat(el.dataset.canvasY) || 0;
-                if (lx >= x && lx <= x + w && ly >= y && ly <= y + h) el.remove();
+                if (Math.hypot(lx - pos.x, ly - pos.y) <= r) {
+                    el.remove();
+                }
             });
-
-            saveCurrentPageInMemory();
         }
 
-        function removeEraserPreview() { if (eraserPreview) { eraserPreview.remove(); eraserPreview = null; } }
+        /* 2. बॉक्स/आयत एरिया चुनकर मिटाना (Box/Area Erase) */
+        function eraseRectSelection(x, y, w, h) {
+            if (!masterCtx || !masterCanvas || w < 1 || h < 1) return;
 
-        /* CLONE STAMP TOOL */
+            try {
+                const autoToggle = document.getElementById('autoBgColorToggle');
+                const isAutoBg = !autoToggle || autoToggle.checked;
+                const manualColor = document.getElementById('eraserColor')?.value || '#ffffff';
+                const paperFillColor = isAutoBg ? getSurroundingPaperColor(x, y, w, h) : manualColor;
+                const paperRGB = parseColorToRGB(paperFillColor);
+
+                const rx = Math.max(0, Math.floor(x));
+                const ry = Math.max(0, Math.floor(y));
+                const rw = Math.min(masterCanvas.width - rx, Math.ceil(w));
+                const rh = Math.min(masterCanvas.height - ry, Math.ceil(h));
+                if (rw < 1 || rh < 1) return;
+
+                if (magicEraserMode) {
+                    const targetColorHex = document.getElementById('eraserColor')?.value || '#000000';
+                    const targetRGB = parseColorToRGB(targetColorHex);
+                    const tol = Math.max(5, magicEraserTolerance || 45);
+
+                    const imgData = masterCtx.getImageData(rx, ry, rw, rh);
+                    const d = imgData.data;
+                    const isCircle = eraserShape === 'circle';
+                    const cx = (x - rx) + w / 2;
+                    const cy = (y - ry) + h / 2;
+                    const rad = Math.max(w, h) / 2;
+
+                    let wipedCount = 0;
+                    for (let py = 0; py < rh; py++) {
+                        for (let px = 0; px < rw; px++) {
+                            if (isCircle && Math.hypot(px + 0.5 - cx, py + 0.5 - cy) > rad) continue;
+                            const i = (py * rw + px) * 4;
+                            const pr = d[i], pg = d[i + 1], pb = d[i + 2];
+                            const distTarget = colorDistance(pr, pg, pb, targetRGB.r, targetRGB.g, targetRGB.b);
+                            const distPaper = colorDistance(pr, pg, pb, paperRGB.r, paperRGB.g, paperRGB.b);
+
+                            if (distTarget <= tol || (distTarget < distPaper && distTarget <= tol * 1.6)) {
+                                d[i]     = paperRGB.r;
+                                d[i + 1] = paperRGB.g;
+                                d[i + 2] = paperRGB.b;
+                                d[i + 3] = 255;
+                                wipedCount++;
+                            }
+                        }
+                    }
+                    masterCtx.putImageData(imgData, rx, ry);
+                    showToast(wipedCount > 0 ? "Magic Erase: स्याही साफ़ की गई ✓" : "इस रंग का कोई पिक्सल यहाँ नहीं मिला");
+                } else {
+                    masterCtx.save();
+                    masterCtx.fillStyle = paperFillColor;
+                    if (eraserShape === 'circle') {
+                        masterCtx.beginPath();
+                        masterCtx.ellipse(rx + rw / 2, ry + rh / 2, rw / 2, rh / 2, 0, 0, Math.PI * 2);
+                        masterCtx.fill();
+                    } else {
+                        masterCtx.fillRect(rx, ry, rw, rh);
+                    }
+                    masterCtx.restore();
+                    showToast("एरिया साफ़ किया गया ✓");
+                }
+
+                document.querySelectorAll('.seamless-text-item').forEach(el => {
+                    const lx = parseFloat(el.dataset.canvasX) || 0;
+                    const ly = parseFloat(el.dataset.canvasY) || 0;
+                    const lw = el.offsetWidth || 30;
+                    const lh = el.offsetHeight || 15;
+                    if (!(lx > rx + rw || lx + lw < rx || ly > ry + rh || ly + lh < ry)) {
+                        el.remove();
+                    }
+                });
+
+                saveCurrentPageInMemory();
+            } catch (err) {
+                console.error('Eraser error:', err);
+            }
+        }
+
+        /* लाइव ब्रश कर्सर जो माउस के साथ घूमता है */
+        function updateEraserCursorPreview(pos) {
+            if (!masterCanvas) return;
+            const container = document.getElementById('fullScreenCanvasContainer');
+            if (!container) return;
+
+            if (!liveEraserCursorElem) {
+                liveEraserCursorElem = document.createElement('div');
+                liveEraserCursorElem.id = 'liveEraserCursor';
+                liveEraserCursorElem.style.cssText = 'position:absolute;pointer-events:none;z-index:99999;border:1.5px dashed #ec4899;transform:translate(-50%, -50%);background:rgba(236,72,153,0.15);box-sizing:border-box;display:none;';
+                container.appendChild(liveEraserCursorElem);
+            }
+
+            if (!isEraserMode || eraserType === 'box') {
+                liveEraserCursorElem.style.display = 'none';
+                return;
+            }
+
+            const sx = masterCanvas.offsetWidth / masterCanvas.width;
+            const sy = masterCanvas.offsetHeight / masterCanvas.height;
+            const w = eraserBrushSize * sx;
+            const h = eraserBrushSize * sy;
+
+            liveEraserCursorElem.style.display = 'block';
+            liveEraserCursorElem.style.left = `${pos.x * sx}px`;
+            liveEraserCursorElem.style.top = `${pos.y * sy}px`;
+            liveEraserCursorElem.style.width = `${w}px`;
+            liveEraserCursorElem.style.height = `${h}px`;
+            liveEraserCursorElem.style.borderRadius = eraserShape === 'circle' ? '50%' : '2px';
+        }
+
+        function hideLiveEraserCursor() {
+            if (liveEraserCursorElem) {
+                liveEraserCursorElem.style.display = 'none';
+            }
+        }
+
+        function removeEraserPreview() { 
+            if (eraserPreview) { 
+                eraserPreview.remove(); 
+                eraserPreview = null; 
+            } 
+        }
+
+        function updateEraserPreviewDOM(pNative) {
+            if (!eraserPreview || !eraserStart || !masterCanvas) return;
+            const pctStartX = (eraserStart.x / masterCanvas.width) * 100;
+            const pctStartY = (eraserStart.y / masterCanvas.height) * 100;
+            const pctPx = (pNative.x / masterCanvas.width) * 100;
+            const pctPy = (pNative.y / masterCanvas.height) * 100;
+
+            const leftPct = Math.min(pctStartX, pctPx);
+            const topPct = Math.min(pctStartY, pctPy);
+            const widthPct = Math.max((eraserBrushSize / masterCanvas.width) * 100, Math.abs(pctPx - pctStartX));
+            const heightPct = Math.max((eraserBrushSize / masterCanvas.height) * 100, Math.abs(pctPy - pctStartY));
+
+            eraserPreview.style.left = `${leftPct}%`; 
+            eraserPreview.style.top = `${topPct}%`;
+            eraserPreview.style.width = `${widthPct}%`; 
+            eraserPreview.style.height = `${heightPct}%`;
+            eraserPreview.style.borderRadius = eraserShape === 'circle' ? '50%' : '0';
+        }
+
+        function initDirectCanvasEraserListeners() {
+            const container = document.getElementById('fullScreenCanvasContainer');
+            if (!container) return;
+
+            // सीधे कंटेनर पर क्लिक कैप्चर करें ताकि OCR या अन्य लेयर्स इसे ब्लॉक न कर सकें
+            container.addEventListener('mousedown', function(e) {
+                if (!isEraserMode || isSpacePressed || e.button !== 0) return;
+                e.preventDefault();
+                e.stopPropagation();
+
+                isErasing = true;
+                const pos = getCanvasNativeCoordinates(e.clientX, e.clientY);
+                eraserStart = pos;
+                eraserLastPos = pos;
+
+                // मैजिक रबर: क्लिक किए गए पिक्सल का असली रंग तुरंत ऑटो-सैंपल करें
+                if (magicEraserMode && masterCtx) {
+                    try {
+                        const pxData = masterCtx.getImageData(Math.floor(pos.x), Math.floor(pos.y), 1, 1).data;
+                        const hex = rgbToHex(pxData[0], pxData[1], pxData[2]);
+                        const bgInput = document.getElementById('eraserColor');
+                        if (bgInput) bgInput.value = hex;
+                    } catch(err) {}
+                }
+
+                saveUndoState();
+
+                if (eraserType === 'brush') {
+                    eraseBrushAt(pos, null);
+                } else {
+                    removeEraserPreview();
+                    eraserPreview = document.createElement('div');
+                    eraserPreview.className = 'editor-eraser-preview';
+                    container.appendChild(eraserPreview);
+                    updateEraserPreviewDOM(pos);
+                }
+            }, true);
+        }
+
+        window.addEventListener('mousemove', (e) => {
+            if (!masterCanvas) return;
+            const pos = getCanvasNativeCoordinates(e.clientX, e.clientY);
+
+            if (isEraserMode) {
+                updateEraserCursorPreview(pos);
+                if (isErasing) {
+                    if (eraserType === 'brush') {
+                        eraseBrushAt(pos, eraserLastPos);
+                        eraserLastPos = pos;
+                    } else {
+                        updateEraserPreviewDOM(pos);
+                    }
+                }
+            }
+        });
+
+        window.addEventListener('mouseup', (e) => {
+            if (!isEraserMode || !isErasing || !masterCanvas) return;
+            isErasing = false;
+            try {
+                const pos = getCanvasNativeCoordinates(e.clientX, e.clientY);
+                if (eraserType === 'box' && eraserStart) {
+                    const minX = Math.min(eraserStart.x, pos.x);
+                    const minY = Math.min(eraserStart.y, pos.y);
+                    const w = Math.max(eraserBrushSize, Math.abs(pos.x - eraserStart.x));
+                    const h = Math.max(eraserBrushSize, Math.abs(pos.y - eraserStart.y));
+                    eraseRectSelection(minX, minY, w, h);
+                } else {
+                    saveCurrentPageInMemory();
+                }
+            } finally {
+                removeEraserPreview();
+                eraserStart = null;
+                eraserLastPos = null;
+            }
+        });
+
+        /* ========================================================
+           CLONE STAMP TOOL
+           ======================================================== */
         function toggleStampTool(forceState) {
             isStampMode = forceState !== undefined ? forceState : !isStampMode;
             const canvasContainer = document.getElementById('fullScreenCanvasContainer');
@@ -1991,15 +2219,15 @@
             if (isStampMode) {
                 deselectAllText();
                 stampSourcePoint = null;
+                if (canvasContainer) canvasContainer.classList.add('stamp-mode-active');
                 if (masterCanvas) masterCanvas.classList.add('eraser-active');
-                if (canvasContainer) canvasContainer.classList.add('eraser-mode-active');
                 showToast("Alt + Click से सोर्स कॉपी करें, फिर पेंट करें");
             } else {
                 stampSourcePoint = null;
                 isStampPainting = false;
                 removeStampCursorPreview();
+                if (canvasContainer) canvasContainer.classList.remove('stamp-mode-active');
                 if (masterCanvas) masterCanvas.classList.remove('eraser-active');
-                if (canvasContainer) canvasContainer.classList.remove('eraser-mode-active');
             }
             if (activePastedElem) {
                 activePastedElem.style.pointerEvents = 'auto';
@@ -2025,14 +2253,18 @@
         }
 
         function initStampCanvasListeners() {
-            if (!masterCanvas) return;
-            masterCanvas.addEventListener('mousedown', function(e) {
+            const container = document.getElementById('fullScreenCanvasContainer');
+            if (!container) return;
+
+            container.addEventListener('mousedown', function(e) {
                 if (!isStampMode || isSpacePressed || e.button !== 0) return;
                 const pos = getCanvasNativeCoordinates(e.clientX, e.clientY);
 
                 if (e.altKey || !stampSourcePoint) {
                     stampSourcePoint = pos;
                     showToast("स्टैंप सोर्स सेट हो गया ✓ अब शब्द पर पेंट करें");
+                    e.preventDefault();
+                    e.stopPropagation();
                     return;
                 }
 
@@ -2041,7 +2273,9 @@
                 stampOffsetY = pos.y - stampSourcePoint.y;
                 saveUndoState();
                 paintStampAt(pos);
-            });
+                e.preventDefault();
+                e.stopPropagation();
+            }, true);
         }
 
         window.addEventListener('mousemove', (e) => {
