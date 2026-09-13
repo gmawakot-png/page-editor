@@ -422,10 +422,12 @@
         let masterCtx = null;
         
         let eraserBrushSize = 25;
-        let eraserOpacity = 50;
+        let eraserOpacity = 100;
         let eraserShape = 'rect';
         let eraserStart = null;
         let eraserPreview = null;
+        let magicEraserMode = false;
+        let magicEraserTolerance = 40;
         let straightenState = null;
 
         // Stamp tool
@@ -571,30 +573,36 @@
             } else if (tool === 'eraser') {
                 group.innerHTML = `
                     <span class="text-pink-400 font-bold flex items-center gap-1"><i class="fa-solid fa-eraser"></i> Eraser:</span>
+                    <label class="flex items-center gap-1.5 text-[11px] font-bold cursor-pointer px-2 py-0.5 rounded border ${magicEraserMode ? 'bg-amber-600/40 border-amber-400 text-amber-200' : 'bg-slate-800 border-slate-600 text-slate-300'}" title="सिर्फ चुने रंग को मिटाए">
+                        <input type="checkbox" id="magicEraserToggle" ${magicEraserMode ? 'checked' : ''} onchange="toggleMagicEraser(this.checked)" class="accent-amber-500 w-3.5 h-3.5 cursor-pointer">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Magic
+                    </label>
+                    <div class="flex items-center gap-1 bg-[#181a1f] px-1.5 py-0.5 rounded border border-slate-700">
+                        <span class="text-[10px] text-slate-400">Tol:</span>
+                        <input type="range" id="magicTolRange" min="8" max="90" value="${magicEraserTolerance}" oninput="updateMagicTolerance(this.value)" class="w-14 accent-amber-500 h-1 cursor-pointer">
+                        <span id="magicTolVal" class="font-bold text-[10px] text-amber-400 min-w-[20px]">${magicEraserTolerance}</span>
+                    </div>
+                    <div class="h-4 w-[1px] bg-slate-700"></div>
                     <div class="flex items-center gap-1 bg-[#181a1f] px-1.5 py-0.5 rounded border border-slate-700">
                         <span class="text-[10px] text-slate-400">Size:</span>
-                        <input type="range" id="eraserSizeRange" min="5" max="150" value="${eraserBrushSize}" oninput="updateEraserBrushSize()" class="w-20 accent-pink-500 h-1 cursor-pointer">
-                        <span id="eraserSizeVal" class="font-bold text-[10px] text-pink-400 min-w-[25px]">${eraserBrushSize}px</span>
+                        <input type="range" id="eraserSizeRange" min="5" max="200" value="${eraserBrushSize}" oninput="updateEraserBrushSize()" class="w-16 accent-pink-500 h-1 cursor-pointer">
+                        <span id="eraserSizeVal" class="font-bold text-[10px] text-pink-400 min-w-[28px]">${eraserBrushSize}px</span>
                     </div>
                     <div class="flex items-center gap-1 bg-[#181a1f] px-1.5 py-0.5 rounded border border-slate-700">
-                        <span class="text-[10px] text-slate-400">Opacity:</span>
-                        <input type="range" id="eraserOpacityRange" min="10" max="100" value="${typeof eraserOpacity !== 'undefined' ? eraserOpacity : 50}" oninput="updateEraserOpacity()" class="w-16 accent-pink-500 h-1 cursor-pointer">
-                        <span id="eraserOpacityVal" class="font-bold text-[10px] text-pink-400 min-w-[28px]">${typeof eraserOpacity !== 'undefined' ? eraserOpacity : 50}%</span>
-                    </div>
-                    <div class="flex items-center gap-1 bg-[#181a1f] px-1.5 py-0.5 rounded border border-slate-700">
-                        <span class="text-[10px] text-slate-400">Feather:</span>
-                        <input type="range" id="eraserFeatherRange" min="0" max="30" value="10" oninput="document.getElementById('eraserFeatherVal').innerText = this.value + 'px'" class="w-16 accent-pink-500 h-1 cursor-pointer">
-                        <span id="eraserFeatherVal" class="font-bold text-[10px] text-pink-400 min-w-[25px]">10px</span>
+                        <span class="text-[10px] text-slate-400">Op:</span>
+                        <input type="range" id="eraserOpacityRange" min="20" max="100" value="${typeof eraserOpacity !== 'undefined' ? eraserOpacity : 80}" oninput="updateEraserOpacity()" class="w-12 accent-pink-500 h-1 cursor-pointer">
+                        <span id="eraserOpacityVal" class="font-bold text-[10px] text-pink-400 min-w-[28px]">${typeof eraserOpacity !== 'undefined' ? eraserOpacity : 80}%</span>
                     </div>
                     <div class="flex items-center gap-1">
-                        <button onclick="setEraserShape('rect')" class="px-2 py-0.5 rounded text-[10px] font-bold ${eraserShape === 'rect' ? 'bg-pink-600 text-white' : 'bg-slate-700 text-slate-300'}">▭ आयत</button>
-                        <button onclick="setEraserShape('circle')" class="px-2 py-0.5 rounded text-[10px] font-bold ${eraserShape === 'circle' ? 'bg-pink-600 text-white' : 'bg-slate-700 text-slate-300'}">◯ गोल</button>
+                        <button onclick="setEraserShape('rect')" class="px-1.5 py-0.5 rounded text-[10px] font-bold ${eraserShape === 'rect' ? 'bg-pink-600 text-white' : 'bg-slate-700 text-slate-300'}">▭</button>
+                        <button onclick="setEraserShape('circle')" class="px-1.5 py-0.5 rounded text-[10px] font-bold ${eraserShape === 'circle' ? 'bg-pink-600 text-white' : 'bg-slate-700 text-slate-300'}">◯</button>
                     </div>
-                    <label class="flex items-center gap-1 text-[11px] text-slate-300 cursor-pointer ml-1">
-                        <input type="checkbox" id="autoBgColorToggle" checked class="accent-pink-600 w-3 h-3"> Auto Paper Match
+                    <label class="flex items-center gap-1 text-[11px] text-slate-300 cursor-pointer">
+                        <input type="checkbox" id="autoBgColorToggle" checked class="accent-pink-600 w-3 h-3"> Paper
                     </label>
+                    <span class="text-[10px] text-amber-300/80">🎯 मिटाने वाला रंग = Background swatch / Eyedropper</span>
                 `;
-            } else if (tool === 'stamp') {
+            } else if (tool === 'stamp') {            } else if (tool === 'stamp') {
                 group.innerHTML = `
                     <span class="text-violet-400 font-bold flex items-center gap-1"><i class="fa-solid fa-stamp"></i> Clone Stamp:</span>
                     <div class="flex items-center gap-1 bg-[#181a1f] px-1.5 py-0.5 rounded border border-slate-700">
@@ -886,7 +894,7 @@
                     const result = await eyeDropper.open();
                     if (activePsTool === 'eraser' || isEraserMode) {
                         document.getElementById('eraserColor').value = result.sRGBHex;
-                        showToast("रबर का रंग सेट: " + result.sRGBHex);
+                        showToast((magicEraserMode ? "Magic: यह रंग मिटेगा → " : "रबर का रंग सेट: ") + result.sRGBHex);
                     } else {
                         document.getElementById('liveInkColor').value = result.sRGBHex;
                         if (selectedTextElems.length > 0) applySelectedInkColor(result.sRGBHex);
@@ -1864,40 +1872,107 @@
             return document.getElementById('eraserColor')?.value || '#ffffff';
         }
 
-        function eraseRectSelection(x, y, w, h) {
-            saveUndoState();
-            const autoToggle = document.getElementById('autoBgColorToggle');
-            const isAutoBg = autoToggle && autoToggle.checked === true;
-            let eraseColor = '#ffffff';
-            if (isAutoBg) {
-                eraseColor = getSurroundingPaperColor(x, y, w, h);
-            } else {
-                const bgSwatch = document.getElementById('eraserColor');
-                eraseColor = (bgSwatch && bgSwatch.value) ? bgSwatch.value : '#ffffff';
+        function toggleMagicEraser(on) {
+            magicEraserMode = !!on;
+            if (typeof eraserOpacity === 'number' && magicEraserMode && eraserOpacity < 70) {
+                eraserOpacity = 90;
             }
-            const feather = Math.max(0, parseInt(document.getElementById('eraserFeatherRange')?.value || 10));
-            const rawOp = (typeof eraserOpacity === 'number') ? eraserOpacity : 50;
-            const opacity = Math.min(1.0, Math.max(0.1, rawOp / 50));
-
-            masterCtx.save();
-            masterCtx.globalAlpha = opacity;
-            if (feather > 0) {
-                const pad = feather * 3;
-                const off = document.createElement('canvas');
-                off.width = w + pad * 2; off.height = h + pad * 2;
-                const octx = off.getContext('2d');
-                octx.filter = `blur(${feather}px)`;
-                octx.fillStyle = eraseColor;
-                if (eraserShape === 'circle') {
-                    octx.beginPath();
-                    octx.arc((w + pad * 2) / 2, (h + pad * 2) / 2, Math.max(w, h) / 2, 0, Math.PI * 2);
-                    octx.fill();
-                } else {
-                    octx.fillRect(pad, pad, w, h);
+            renderTopOptionsBar('eraser');
+            showToast(magicEraserMode
+                ? "Magic ON — Eyedropper से रंग चुनें, बॉक्स खींचें → सिर्फ वही रंग मिटेगा"
+                : "Normal Eraser — पूरा बॉक्स मिटेगा");
+        }
+        function updateMagicTolerance(val) {
+            magicEraserTolerance = parseInt(val) || 40;
+            const el = document.getElementById('magicTolVal');
+            if (el) el.innerText = String(magicEraserTolerance);
+        }
+        function parseColorToRGB(c) {
+            let r = 255, g = 255, b = 255;
+            if (!c || typeof c !== 'string') return { r, g, b };
+            if (c.startsWith('#')) {
+                const h = c.slice(1);
+                if (h.length === 3) {
+                    r = parseInt(h[0]+h[0], 16); g = parseInt(h[1]+h[1], 16); b = parseInt(h[2]+h[2], 16);
+                } else if (h.length >= 6) {
+                    r = parseInt(h.slice(0,2), 16); g = parseInt(h.slice(2,4), 16); b = parseInt(h.slice(4,6), 16);
                 }
-                masterCtx.drawImage(off, x - pad, y - pad);
             } else {
-                masterCtx.fillStyle = eraseColor;
+                const m = c.match(/\d+/g);
+                if (m && m.length >= 3) { r = +m[0]; g = +m[1]; b = +m[2]; }
+            }
+            return { r, g, b };
+        }
+        function colorDistance(r1, g1, b1, r2, g2, b2) {
+            const dr = r1 - r2, dg = g1 - g2, db = b1 - b2;
+            return Math.sqrt(dr*dr + dg*dg + db*db);
+        }
+
+        function eraseRectSelection(x, y, w, h) {
+            if (!masterCtx || !masterCanvas || w < 1 || h < 1) return;
+            saveUndoState();
+
+            const autoToggle = document.getElementById('autoBgColorToggle');
+            const isAutoBg = !autoToggle || autoToggle.checked;
+            let fillColor = '#ffffff';
+            if (isAutoBg) {
+                fillColor = getSurroundingPaperColor(x, y, w, h);
+            } else {
+                fillColor = document.getElementById('eraserColor')?.value || '#ffffff';
+            }
+            const fill = parseColorToRGB(fillColor);
+            const rawOp = (typeof eraserOpacity === 'number') ? eraserOpacity : 90;
+            const opacity = Math.min(1, Math.max(0.15, rawOp / 100));
+
+            const rx = Math.max(0, Math.floor(x));
+            const ry = Math.max(0, Math.floor(y));
+            const rw = Math.min(masterCanvas.width - rx, Math.ceil(w));
+            const rh = Math.min(masterCanvas.height - ry, Math.ceil(h));
+            if (rw < 1 || rh < 1) return;
+
+            if (magicEraserMode) {
+                // MAGIC: fully wipe matching color (not fade)
+                const target = parseColorToRGB(document.getElementById('eraserColor')?.value || '#000000');
+                const tol = Math.max(5, magicEraserTolerance || 40);
+                const imgData = masterCtx.getImageData(rx, ry, rw, rh);
+                const d = imgData.data;
+                const isCircle = eraserShape === 'circle';
+                const cx = (x - rx) + w / 2;
+                const cy = (y - ry) + h / 2;
+                const rad = Math.max(w, h) / 2;
+                // opacity 100 => full wipe in one pass for good matches
+                const strength = Math.min(1, Math.max(0.4, opacity));
+
+                for (let py = 0; py < rh; py++) {
+                    for (let px = 0; px < rw; px++) {
+                        if (isCircle) {
+                            if (Math.hypot(px + 0.5 - cx, py + 0.5 - cy) > rad) continue;
+                        }
+                        const i = (py * rw + px) * 4;
+                        const pr = d[i], pg = d[i+1], pb = d[i+2];
+                        const dist = colorDistance(pr, pg, pb, target.r, target.g, target.b);
+                        if (dist > tol) continue;
+
+                        // Strong replace: exact match = full paper; near tol = still solid wipe
+                        let match = 1 - (dist / tol);
+                        let f;
+                        if (strength >= 0.75) {
+                            // High opacity: wipe hard in 1 pass
+                            f = (dist < tol * 0.7) ? 1 : Math.max(0.65, match);
+                        } else {
+                            f = Math.min(1, Math.max(0.45, match * strength * 1.5));
+                        }
+                        d[i]     = Math.round(pr * (1 - f) + fill.r * f);
+                        d[i + 1] = Math.round(pg * (1 - f) + fill.g * f);
+                        d[i + 2] = Math.round(pb * (1 - f) + fill.b * f);
+                    }
+                }
+                masterCtx.putImageData(imgData, rx, ry);
+            } else {
+                // NORMAL: fill whole rect/circle with paper color
+                masterCtx.save();
+                masterCtx.globalAlpha = opacity;
+                masterCtx.fillStyle = fillColor;
                 if (eraserShape === 'circle') {
                     masterCtx.beginPath();
                     masterCtx.arc(x + w / 2, y + h / 2, Math.max(w, h) / 2, 0, Math.PI * 2);
@@ -1905,8 +1980,8 @@
                 } else {
                     masterCtx.fillRect(x, y, w, h);
                 }
+                masterCtx.restore();
             }
-            masterCtx.restore();
 
             document.querySelectorAll('.seamless-text-item').forEach(el => {
                 const lx = parseFloat(el.dataset.canvasX) || 0;
@@ -2312,31 +2387,48 @@
         function commitActivePastedObject() {
             if (!activePastedData || !masterCanvas || !masterCtx) return;
             const rot = activePastedData.rotation || 0;
-            
+            const ax = Math.round(activePastedData.x);
+            const ay = Math.round(activePastedData.y);
+            const aw = activePastedData.w;
+            const ah = activePastedData.h;
+
+            // Snapshot UNDER pixels BEFORE drawing paste — exact restore on reselect
+            let underDataUrl = null;
+            try {
+                const pad = 2;
+                const sx = Math.max(0, ax - pad);
+                const sy = Math.max(0, ay - pad);
+                const sw = Math.min(masterCanvas.width - sx, aw + pad * 2);
+                const sh = Math.min(masterCanvas.height - sy, ah + pad * 2);
+                const under = document.createElement('canvas');
+                under.width = sw; under.height = sh;
+                under.getContext('2d').drawImage(masterCanvas, sx, sy, sw, sh, 0, 0, sw, sh);
+                underDataUrl = under.toDataURL('image/png');
+                activePastedData._underMeta = { sx, sy, sw, sh };
+            } catch (e) {}
+
             masterCtx.save();
-            // पारदर्शी लेयर सीधे ओरिजिनल कैनवास पर स्वच्छ रूप से ड्रा होती है
             masterCtx.globalCompositeOperation = 'source-over';
             if (rot) {
-                const cx = activePastedData.x + activePastedData.w / 2;
-                const cy = activePastedData.y + activePastedData.h / 2;
+                const cx = ax + aw / 2;
+                const cy = ay + ah / 2;
                 masterCtx.translate(cx, cy);
                 masterCtx.rotate((rot * Math.PI) / 180);
-                masterCtx.drawImage(activePastedData.canvas, -activePastedData.w / 2, -activePastedData.h / 2);
+                masterCtx.drawImage(activePastedData.canvas, -aw / 2, -ah / 2);
             } else {
-                masterCtx.drawImage(activePastedData.canvas, Math.round(activePastedData.x), Math.round(activePastedData.y));
+                masterCtx.drawImage(activePastedData.canvas, ax, ay);
             }
             masterCtx.restore();
 
             try {
                 const layers = ensurePasteLayers();
                 layers.push({
-                    x: activePastedData.x,
-                    y: activePastedData.y,
-                    w: activePastedData.w,
-                    h: activePastedData.h,
+                    x: ax, y: ay, w: aw, h: ah,
                     rotation: rot,
                     isTransparent: activePastedData.isTransparent,
-                    dataUrl: activePastedData.canvas.toDataURL('image/png')
+                    dataUrl: activePastedData.canvas.toDataURL('image/png'),
+                    underDataUrl: underDataUrl,
+                    underMeta: activePastedData._underMeta || null
                 });
             } catch (err) {}
             if (activePastedElem) { activePastedElem.remove(); activePastedElem = null; }
@@ -2365,33 +2457,70 @@
                 if (!hit) continue;
 
                 saveUndoState();
-                const bg = getSurroundingPaperColor(L.x, L.y, L.w, L.h);
-                masterCtx.save();
-                masterCtx.fillStyle = bg;
-                if (rot) {
-                    const cx = L.x + L.w / 2, cy = L.y + L.h / 2;
-                    masterCtx.translate(cx, cy);
-                    masterCtx.rotate((rot * Math.PI) / 180);
-                    masterCtx.fillRect(-L.w / 2 - 1, -L.h / 2 - 1, L.w + 2, L.h + 2);
-                } else {
-                    masterCtx.fillRect(L.x - 1, L.y - 1, L.w + 2, L.h + 2);
-                }
-                masterCtx.restore();
+
+                // EXACT restore of under-pixels (no paper fill box, no background change)
+                const restoreUnder = (cb) => {
+                    if (L.underDataUrl && L.underMeta) {
+                        const uimg = new Image();
+                        uimg.onload = function() {
+                            masterCtx.drawImage(uimg, L.underMeta.sx, L.underMeta.sy);
+                            cb();
+                        };
+                        uimg.onerror = function() { cb(); };
+                        uimg.src = L.underDataUrl;
+                    } else {
+                        // Fallback for old layers without under snapshot: alpha-masked paper only on ink pixels
+                        const img2 = new Image();
+                        img2.onload = function() {
+                            const temp = document.createElement('canvas');
+                            temp.width = L.w; temp.height = L.h;
+                            const tctx = temp.getContext('2d');
+                            tctx.drawImage(img2, 0, 0);
+                            const src = tctx.getImageData(0, 0, L.w, L.h).data;
+                            const bg = getSurroundingPaperColor(L.x, L.y, L.w, L.h);
+                            const fill = parseColorToRGB(bg);
+                            const sx = Math.max(0, Math.floor(L.x));
+                            const sy = Math.max(0, Math.floor(L.y));
+                            const sw = Math.min(masterCanvas.width - sx, L.w);
+                            const sh = Math.min(masterCanvas.height - sy, L.h);
+                            const cd = masterCtx.getImageData(sx, sy, sw, sh);
+                            const d = cd.data;
+                            for (let py = 0; py < sh; py++) {
+                                for (let px = 0; px < sw; px++) {
+                                    const a = src[(py * L.w + px) * 4 + 3];
+                                    if (a < 12) continue;
+                                    const di = (py * sw + px) * 4;
+                                    const f = a / 255;
+                                    d[di]     = Math.round(d[di]     * (1 - f) + fill.r * f);
+                                    d[di + 1] = Math.round(d[di + 1] * (1 - f) + fill.g * f);
+                                    d[di + 2] = Math.round(d[di + 2] * (1 - f) + fill.b * f);
+                                }
+                            }
+                            masterCtx.putImageData(cd, sx, sy);
+                            cb();
+                        };
+                        img2.onerror = function() { cb(); };
+                        img2.src = L.dataUrl;
+                    }
+                };
 
                 const img = new Image();
                 img.onload = function() {
                     const temp = document.createElement('canvas');
                     temp.width = L.w; temp.height = L.h;
                     temp.getContext('2d').drawImage(img, 0, 0);
-                    if (activePastedData) commitActivePastedObject();
-                    activePastedData = {
-                        canvas: temp,
-                        x: L.x, y: L.y, w: L.w, h: L.h,
-                        rotation: rot,
-                        isTransparent: L.isTransparent ?? true
-                    };
-                    createFloatingPastedDOM();
-                    showToast("फिर से चुना — खींचें / घुमाएँ / Enter से लॉक");
+
+                    restoreUnder(function() {
+                        if (activePastedData) commitActivePastedObject();
+                        activePastedData = {
+                            canvas: temp,
+                            x: L.x, y: L.y, w: L.w, h: L.h,
+                            rotation: rot,
+                            isTransparent: L.isTransparent ?? true
+                        };
+                        createFloatingPastedDOM();
+                        showToast("फिर से चुना — खींचें / Enter से लॉक (बैकग्राउंड नहीं बदलेगा)");
+                    });
                 };
                 img.src = L.dataUrl;
                 layers.splice(i, 1);
@@ -2401,7 +2530,7 @@
             return false;
         }
 
-        function createFloatingPastedDOM() {
+function createFloatingPastedDOM() {
             if (activePastedElem) activePastedElem.remove();
             if (!activePastedData || !masterCanvas) return;
 
