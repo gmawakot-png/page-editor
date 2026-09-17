@@ -70,28 +70,31 @@
         .seamless-text-item {
             position: absolute;
             outline: none !important;
-            border: 1px dashed transparent;
+            border: none !important;
             white-space: pre-wrap;
             word-break: break-word;
             cursor: text;
             user-select: text;
             line-height: 1.15;
-            padding: 0px;
-            margin: 0;
+            padding: 0px !important;
+            margin: 0 !important;
             box-sizing: border-box;
             background: transparent;
             transform-origin: 0 0;
             z-index: 60;
         }
         .seamless-text-item:hover {
-            border: 1px dashed rgba(56, 189, 248, 0.5);
+            outline: 1px dashed rgba(56, 189, 248, 0.6) !important;
+            outline-offset: 1px;
         }
         .seamless-text-item.selected {
-            border: 1px dashed #38bdf8 !important;
+            outline: 1px dashed #38bdf8 !important;
+            outline-offset: 1px;
             background: rgba(56, 189, 248, 0.08);
         }
         .seamless-text-item.editing {
-            border: 1px solid #38bdf8 !important;
+            outline: 1px solid #38bdf8 !important;
+            outline-offset: 1px;
             background: rgba(15, 23, 42, 0.25) !important;
             cursor: text !important;
             user-select: text !important;
@@ -181,12 +184,14 @@
             border: 1px dashed transparent;
             z-index: 50;
             transform-origin: 0 0;
+            background: transparent !important;
         }
         .pasted-img-box:hover {
             border: 1px dashed rgba(56, 189, 248, 0.5);
         }
         .pasted-img-box.selected {
             border: 1px dashed #38bdf8 !important;
+            background: transparent !important;
         }
         .editor-eraser-preview {
             position: absolute;
@@ -242,11 +247,11 @@
                             <span class="text-[10px] text-slate-400">Ctrl+Y</span>
                         </button>
                         <div class="h-[1px] bg-slate-700 my-1"></div>
-                        <button onclick="cutMarqueeArea()" class="w-full text-left px-3 py-1.5 hover:bg-sky-600 hover:text-white flex items-center justify-between">
+                        <button onclick="cutCurrentSelection()" class="w-full text-left px-3 py-1.5 hover:bg-sky-600 hover:text-white flex items-center justify-between">
                             <span><i class="fa-solid fa-scissors w-4"></i> Cut</span>
                             <span class="text-[10px] text-slate-400">Ctrl+X</span>
                         </button>
-                        <button onclick="copyMarqueeArea()" class="w-full text-left px-3 py-1.5 hover:bg-sky-600 hover:text-white flex items-center justify-between">
+                        <button onclick="copyCurrentSelection()" class="w-full text-left px-3 py-1.5 hover:bg-sky-600 hover:text-white flex items-center justify-between">
                             <span><i class="fa-solid fa-copy w-4"></i> Copy</span>
                             <span class="text-[10px] text-slate-400">Ctrl+C</span>
                         </button>
@@ -484,6 +489,12 @@
         const MAX_HISTORY = 25;
 
         let internalClipboardCanvas = null;
+        let internalClipboardText = null;
+        let internalClipboardDataUrl = null;
+        let internalClipboardW = 0;
+        let internalClipboardH = 0;
+        let internalClipboardType = null;
+        let copyTransparentBackground = true;
 
         let cloneSource = null;
         let isCloning = false;
@@ -496,6 +507,8 @@
         let eraserBrushSize = 5;
         let magicEraserMode = true;
         let magicEraserTolerance = 45;
+        let magicEraserPass = 0;
+        let magicEraserLastTarget = null;
         let blendEraserWithCanvas = false;
         let eraserBlendStrength = 85;
         let lastCanvasPoint = { x: 0, y: 0 };
@@ -533,6 +546,8 @@
             masterCanvas.height = 1754;
             masterCtx.fillStyle = '#ffffff';
             masterCtx.fillRect(0, 0, masterCanvas.width, masterCanvas.height);
+            undoStack.length = 0;
+            redoStack.length = 0;
             saveUndoState();
             fitToScreen();
             updateDimensionLabel();
@@ -647,8 +662,7 @@
         }
 
         function getCanvasNativeCoordinates(clientX, clientY) {
-            const layer = document.getElementById('canvasTransformLayer');
-            const rect = layer.getBoundingClientRect();
+            const rect = masterCanvas.getBoundingClientRect();
             return {
                 x: Math.round((clientX - rect.left) / currentScale),
                 y: Math.round((clientY - rect.top) / currentScale)
@@ -721,9 +735,13 @@
             } else if (tool === 'marquee') {
                 group.innerHTML = `
                     <span class="text-sky-400 font-bold flex items-center gap-1"><i class="fa-regular fa-square"></i> मार्की:</span>
-                    <button onclick="copyMarqueeArea()" class="sub-bar-btn"><i class="fa-solid fa-copy"></i> कॉपी</button>
-                    <button onclick="cutMarqueeArea()" class="sub-bar-btn"><i class="fa-solid fa-scissors"></i> कट</button>
+                    <button onclick="copyCurrentSelection()" class="sub-bar-btn"><i class="fa-solid fa-copy"></i> कॉपी</button>
+                    <button onclick="cutCurrentSelection()" class="sub-bar-btn"><i class="fa-solid fa-scissors"></i> कट</button>
                     <button onclick="pasteFromClipboard()" class="sub-bar-btn"><i class="fa-solid fa-paste"></i> पेस्ट</button>
+                    <label class="flex items-center gap-1 text-[11px] font-bold cursor-pointer px-2 py-1 rounded border bg-sky-950/60 text-sky-300 border-sky-600 ml-1" title="कॉपी किया शब्द बिना किसी सफ़ेद/बैकग्राउंड बॉक्स के पारदर्शी पेस्ट होगा">
+                        <input type="checkbox" id="chkCopyTransparent" ${copyTransparentBackground ? 'checked' : ''} onchange="toggleCopyTransparent(this.checked)" class="accent-sky-500 w-3.5 h-3.5">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> पारदर्शी (Transparent)
+                    </label>
                     ${getRotationToolbarHTML()}
                 `;
             } else if (tool === 'clone') {
@@ -763,6 +781,14 @@
                         <input type="color" id="eraserTargetColorDirect" value="${fgColor}" onchange="setMagicInkColorDirect(this.value)" class="w-5 h-5 p-0 border-0 rounded cursor-pointer">
                         <button onclick="startInstantEyedropper('fg')" class="sub-bar-btn !px-1.5 !py-0.5 text-[10px]">पिक</button>
                     </div>
+                    <div class="flex items-center gap-1 bg-[#181a1f] px-2 py-1 rounded border border-violet-700" title="हल्के से गहरे शेड तक कितना रंग मिलाना है">
+                        <span class="text-[10px] text-violet-300 font-bold">मिटाने की गहराई:</span>
+                        <input type="range" min="1" max="120" value="${magicEraserTolerance}" oninput="updateMagicEraserTolerance(this.value)" class="w-20 accent-violet-500 h-1">
+                        <span id="magicToleranceVal" class="font-bold text-[10px] text-violet-300">${magicEraserTolerance}</span>
+                    </div>
+                    <button onclick="resetMagicEraserPass()" class="sub-bar-btn !px-1.5 !py-0.5 text-[10px]" title="फिर से चुने हुए रंग से शुरुआत करें">
+                        <i class="fa-solid fa-rotate-left"></i> रीसेट
+                    </button>
                     <div class="flex items-center gap-1 bg-[#181a1f] px-2 py-1 rounded border border-emerald-700">
                         <span class="text-[10px] text-emerald-400 font-bold">सफ़ेद/बैकग्राउंड:</span>
                         <input type="color" id="eraserColorDirect" value="${bgColor}" onchange="setEraserColorDirect(this.value)" class="w-5 h-5 p-0 border-0 rounded cursor-pointer">
@@ -784,6 +810,11 @@
                 `;
             }
             bar.appendChild(group);
+        }
+
+        function toggleCopyTransparent(val) {
+            copyTransparentBackground = val;
+            showToast(val ? 'पारदर्शी कॉपी चालू ✓ (बिना बैकग्राउंड बॉक्स)' : 'सामान्य कॉपी (सफ़ेद बॉक्स के साथ)');
         }
 
         function updateTextToolSize(v) {
@@ -837,12 +868,17 @@
         function setupKeyboardShortcuts() {
             window.addEventListener('keydown', (e) => {
                 const isTyping = e.target.isContentEditable || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT';
-                if (e.code === 'Space' && !isSpacePressed && !isTyping) {
-                    isSpacePressed = true;
-                    document.getElementById('mainViewport').style.cursor = 'grab';
+                
+                // स्पेस बार का डिफ़ॉल्ट स्क्रॉल हर स्थिति में रोकें
+                if (e.code === 'Space' && !isTyping) {
                     e.preventDefault();
+                    if (!isSpacePressed) {
+                        isSpacePressed = true;
+                        document.getElementById('mainViewport').style.cursor = 'grab';
+                    }
                     return;
                 }
+
                 const isEditingNow = document.activeElement && document.activeElement.classList && document.activeElement.classList.contains('editing');
                 if (!e.ctrlKey && !e.altKey && !isEditingNow && (currentTool === 'select' || currentTool === 'text') && getSelectedObject() && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
                     moveSelectedObjectByKeyboard(e.key, e.shiftKey ? 10 : 1);
@@ -853,8 +889,8 @@
 
                 if (e.ctrlKey && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
                 if ((e.ctrlKey && e.key.toLowerCase() === 'y') || (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'z')) { e.preventDefault(); redo(); }
-                if (e.ctrlKey && e.key.toLowerCase() === 'c') { e.preventDefault(); copyMarqueeArea(); }
-                if (e.ctrlKey && e.key.toLowerCase() === 'x') { e.preventDefault(); cutMarqueeArea(); }
+                if (e.ctrlKey && e.key.toLowerCase() === 'c') { e.preventDefault(); copyCurrentSelection(); }
+                if (e.ctrlKey && e.key.toLowerCase() === 'x') { e.preventDefault(); cutCurrentSelection(); }
                 if (e.ctrlKey && e.key.toLowerCase() === 'v') { e.preventDefault(); pasteFromClipboard(); }
                 if (e.key === 'Delete' || e.key === 'Backspace') deleteSelected();
 
@@ -870,6 +906,7 @@
 
             window.addEventListener('keyup', (e) => {
                 if (e.code === 'Space') {
+                    e.preventDefault();
                     isSpacePressed = false;
                     document.getElementById('mainViewport').style.cursor = currentTool === 'pan' ? 'grab' : (currentTool === 'eraser' ? 'crosshair' : 'default');
                 }
@@ -1022,14 +1059,43 @@
             });
         }
 
+        function rgbToHSV(r, g, b) {
+            r /= 255; g /= 255; b /= 255;
+            const max = Math.max(r, g, b), min = Math.min(r, g, b);
+            const d = max - min;
+            let h = 0;
+            if (d !== 0) {
+                if (max === r) h = 60 * (((g - b) / d) % 6);
+                else if (max === g) h = 60 * ((b - r) / d + 2);
+                else h = 60 * ((r - g) / d + 4);
+            }
+            if (h < 0) h += 360;
+            const s = max === 0 ? 0 : d / max;
+            return { h, s, v: max };
+        }
+
+        function hueDistance(a, b) {
+            const d = Math.abs(a - b);
+            return Math.min(d, 360 - d);
+        }
+
         function isPixelTargetColor(r, g, b, targetRGB, tolerance) {
             const d = colorDist(r, g, b, targetRGB.r, targetRGB.g, targetRGB.b);
-            if (d <= tolerance) return true;
             const targetChroma = Math.max(targetRGB.r, targetRGB.g, targetRGB.b) - Math.min(targetRGB.r, targetRGB.g, targetRGB.b);
             const pixelChroma = Math.max(r, g, b) - Math.min(r, g, b);
+
+            if (targetChroma > 25) {
+                if (pixelChroma < Math.max(18, targetChroma * 0.10)) return false;
+                const th = rgbToHSV(targetRGB.r, targetRGB.g, targetRGB.b);
+                const ph = rgbToHSV(r, g, b);
+                const hueLimit = Math.min(42, 20 + tolerance * 0.12);
+                if (hueDistance(th.h, ph.h) > hueLimit) return false;
+                return d <= tolerance;
+            }
+
             const targetLuminance = 0.299 * targetRGB.r + 0.587 * targetRGB.g + 0.114 * targetRGB.b;
             const pixelLuminance = 0.299 * r + 0.587 * g + 0.114 * b;
-            return targetChroma <= 30 && pixelChroma <= 8 && Math.abs(pixelLuminance - targetLuminance) <= tolerance;
+            return pixelChroma <= 18 && Math.abs(pixelLuminance - targetLuminance) <= tolerance;
         }
 
         function getLocalBackgroundColor(data, width, height, px, py, targetRGB) {
@@ -1112,33 +1178,147 @@
             }
         }
 
+        function inpaintMagicBox(x, y, w, h, targetRGB, tolerance) {
+            const pad = Math.max(12, Math.min(36, Math.round(Math.max(w, h) * 0.08)));
+            const sx = Math.max(0, x - pad);
+            const sy = Math.max(0, y - pad);
+            const ex = Math.min(masterCanvas.width, x + w + pad);
+            const ey = Math.min(masterCanvas.height, y + h + pad);
+            const rw = ex - sx, rh = ey - sy;
+            const img = masterCtx.getImageData(sx, sy, rw, rh);
+            const data = img.data;
+            const original = new Uint8ClampedArray(data);
+            const mask = new Uint8Array(rw * rh);
+
+            for (let py = 0; py < h; py++) {
+                for (let px = 0; px < w; px++) {
+                    const gx = x + px, gy = y + py;
+                    if (gx < sx || gy < sy || gx >= ex || gy >= ey) continue;
+                    const lx = gx - sx, ly = gy - sy;
+                    const idx = (ly * rw + lx) * 4;
+                    if (isPixelTargetColor(original[idx], original[idx + 1], original[idx + 2], targetRGB, tolerance)) {
+                        mask[ly * rw + lx] = 1;
+                    }
+                }
+            }
+
+            const ring = [];
+            const addRingPixel = (gx, gy) => {
+                if (gx < 0 || gy < 0 || gx >= masterCanvas.width || gy >= masterCanvas.height) return;
+                const lx = gx - sx, ly = gy - sy;
+                if (lx < 0 || ly < 0 || lx >= rw || ly >= rh) return;
+                const k = (ly * rw + lx) * 4;
+                if (mask[ly * rw + lx]) return;
+                ring.push([original[k], original[k + 1], original[k + 2]]);
+            };
+            for (let gx = x - pad; gx <= x + w + pad; gx++) {
+                addRingPixel(gx, y - pad);
+                addRingPixel(gx, y + h + pad - 1);
+            }
+            for (let gy = y - pad; gy < y + h + pad; gy++) {
+                addRingPixel(x - pad, gy);
+                addRingPixel(x + w + pad - 1, gy);
+            }
+            const ref = ring.length ? {
+                r: median(ring.map(v => v[0])),
+                g: median(ring.map(v => v[1])),
+                b: median(ring.map(v => v[2]))
+            } : parseHexToRGB(bgColor);
+
+            const maxSearch = Math.max(8, Math.min(40, pad + 8));
+            const dirs = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]];
+            const isGoodBackground = (r, g, b) => {
+                const dc = colorDist(r, g, b, ref.r, ref.g, ref.b);
+                return dc <= 48;
+            };
+
+            let remaining = 0;
+            for (let i = 0; i < mask.length; i++) if (mask[i]) remaining++;
+            for (let iter = 0; iter < maxSearch && remaining > 0; iter++) {
+                const updates = [];
+                for (let py = 0; py < rh; py++) {
+                    for (let px = 0; px < rw; px++) {
+                        const m = py * rw + px;
+                        if (!mask[m]) continue;
+                        let sr = 0, sg = 0, sb = 0, sw = 0;
+                        for (const [dx, dy] of dirs) {
+                            let found = false;
+                            for (let step = 1; step <= maxSearch; step++) {
+                                const qx = px + dx * step, qy = py + dy * step;
+                                if (qx < 0 || qy < 0 || qx >= rw || qy >= rh) break;
+                                const qm = qy * rw + qx;
+                                if (mask[qm]) continue;
+                                const qi = qm * 4;
+                                const rr = data[qi], gg = data[qi+1], bb = data[qi+2];
+                                if (!isGoodBackground(rr, gg, bb)) continue;
+                                const weight = 1 / step;
+                                sr += rr * weight; sg += gg * weight; sb += bb * weight; sw += weight;
+                                found = true;
+                                break;
+                            }
+                            if (!found) continue;
+                        }
+                        if (sw > 0) {
+                            updates.push([m, Math.round(sr/sw), Math.round(sg/sw), Math.round(sb/sw)]);
+                        }
+                    }
+                }
+                if (!updates.length) break;
+                for (const [m, rr, gg, bb] of updates) {
+                    const i = m * 4;
+                    data[i] = rr; data[i+1] = gg; data[i+2] = bb; data[i+3] = 255;
+                    mask[m] = 0;
+                    remaining--;
+                }
+            }
+
+            if (remaining > 0) {
+                for (let py = 0; py < rh; py++) {
+                    for (let px = 0; px < rw; px++) {
+                        const m = py * rw + px;
+                        if (!mask[m]) continue;
+                        const i = m * 4;
+                        data[i] = ref.r; data[i+1] = ref.g; data[i+2] = ref.b; data[i+3] = 255;
+                    }
+                }
+            }
+
+            masterCtx.putImageData(img, sx, sy);
+        }
+
         function eraseBoxArea(x, y, w, h) {
             saveUndoState();
             lastEraserArea = { x, y, w, h };
             if (magicEraserMode) {
-                const imgData = masterCtx.getImageData(x, y, w, h);
-                const d = imgData.data;
-                const source = new Uint8ClampedArray(d);
                 const targetRGB = parseHexToRGB(fgColor);
                 const replaceRGB = parseHexToRGB(bgColor);
-                const autoTone = blendEraserWithCanvas ? getCanvasSurroundingTone(x + w / 2, y + h / 2, Math.max(w, h) / 2 + 5) : replaceRGB;
-
-                for (let i = 0; i < d.length; i += 4) {
-                    if (!isPixelTargetColor(d[i], d[i+1], d[i+2], targetRGB, magicEraserTolerance)) continue;
-                    const pixelX = (i / 4) % w;
-                    const pixelY = Math.floor((i / 4) / w);
-                    const replacement = blendEraserWithCanvas ? getLocalBackgroundColor(source, w, h, pixelX, pixelY, targetRGB) : autoTone;
-                    d[i] = replacement.r;
-                    d[i+1] = replacement.g;
-                    d[i+2] = replacement.b;
-                    d[i+3] = 255;
+                const targetKey = fgColor.toLowerCase();
+                if (magicEraserLastTarget !== targetKey) {
+                    magicEraserPass = 0;
+                    magicEraserLastTarget = targetKey;
                 }
-                masterCtx.putImageData(imgData, x, y);
+                const passTolerance = Math.min(255, magicEraserTolerance * (magicEraserPass + 1));
+
+                if (blendEraserWithCanvas) {
+                    inpaintMagicBox(x, y, w, h, targetRGB, passTolerance);
+                } else {
+                    const imgData = masterCtx.getImageData(x, y, w, h);
+                    const d = imgData.data;
+                    for (let i = 0; i < d.length; i += 4) {
+                        if (!isPixelTargetColor(d[i], d[i+1], d[i+2], targetRGB, passTolerance)) continue;
+                        d[i] = replaceRGB.r;
+                        d[i+1] = replaceRGB.g;
+                        d[i+2] = replaceRGB.b;
+                        d[i+3] = 255;
+                    }
+                    masterCtx.putImageData(imgData, x, y);
+                }
+                magicEraserPass++;
             } else {
                 masterCtx.fillStyle = bgColor || '#ffffff';
                 masterCtx.fillRect(x, y, w, h);
             }
-            showToast('एरिया साफ़ किया गया ✓');
+            showToast(`एरिया साफ़ किया गया ✓ (लेवल ${magicEraserPass})`);
         }
 
         function blurLastEraserArea() {
@@ -1219,6 +1399,18 @@
             document.getElementById('eraserSizeVal').innerText = `${eraserBrushSize}px`;
         }
 
+        function updateMagicEraserTolerance(val) {
+            magicEraserTolerance = Math.max(1, Math.min(120, parseInt(val) || 45));
+            const el = document.getElementById('magicToleranceVal');
+            if (el) el.innerText = magicEraserTolerance;
+        }
+
+        function resetMagicEraserPass() {
+            magicEraserPass = 0;
+            magicEraserLastTarget = fgColor.toLowerCase();
+            showToast('मैजिक रबर की गहराई रीसेट ✓');
+        }
+
         function toggleEraserCanvasBlend(on) {
             blendEraserWithCanvas = on;
             showToast(on ? 'बैकग्राउंड से ऑटो-मिलान चालू' : 'नीचे वाला रंग सीधे लागू होगा');
@@ -1238,6 +1430,8 @@
 
         function setMagicInkColorDirect(col) {
             fgColor = col;
+            magicEraserPass = 0;
+            magicEraserLastTarget = col.toLowerCase();
             document.getElementById('globalFgPicker').value = col;
             renderTopOptionsBar('eraser');
         }
@@ -1245,6 +1439,8 @@
         function updateGlobalColor(type, col) {
             if (type === 'fg') {
                 fgColor = col;
+                magicEraserPass = 0;
+                magicEraserLastTarget = col.toLowerCase();
                 if (activeTextElement) activeTextElement.style.color = col;
             } else {
                 bgColor = col;
@@ -1286,9 +1482,6 @@
             }
         }
 
-        /* ========================================================
-           डायरेक्ट टेक्स्ट निर्माण एवं सटीक स्थिति निर्धारण
-           ======================================================== */
         function createNewDirectTextAt(nativeX, nativeY) {
             deselectAllObjects();
             const container = document.getElementById('fullScreenCanvasContainer');
@@ -1321,8 +1514,6 @@
                 if (currentTool === 'pan' || isSpacePressed) return;
                 e.stopPropagation();
 
-                // Double-क्लिक करें, या पहले से एडिटिंग मोड में हों, तो टाइपिंग/सिलेक्शन को
-                // ब्राउज़र के सामान्य व्यवहार पर छोड़ दें (कर्सर उसी जगह लगे जहाँ क्लिक हुआ)।
                 if (e.detail >= 2 || el.classList.contains('editing')) {
                     selectTextItem(el);
                     el.classList.add('editing');
@@ -1428,6 +1619,55 @@
             if (st === 'underline') activeTextElement.style.textDecoration = activeTextElement.style.textDecoration === 'underline' ? 'none' : 'underline';
         }
 
+        function makeCanvasBackgroundTransparent(ctx, w, h) {
+            const imgData = ctx.getImageData(0, 0, w, h);
+            const d = imgData.data;
+
+            const samplesR = [], samplesG = [], samplesB = [];
+            const addSample = (idx) => {
+                samplesR.push(d[idx]);
+                samplesG.push(d[idx + 1]);
+                samplesB.push(d[idx + 2]);
+            };
+
+            for (let i = 0; i < w; i++) {
+                addSample((0 * w + i) * 4);
+                addSample(((h - 1) * w + i) * 4);
+            }
+            for (let j = 0; j < h; j++) {
+                addSample((j * w + 0) * 4);
+                addSample((j * w + (w - 1)) * 4);
+            }
+
+            const bgR = samplesR.length ? median(samplesR) : 255;
+            const bgG = samplesG.length ? median(samplesG) : 255;
+            const bgB = samplesB.length ? median(samplesB) : 255;
+
+            const tolMin = 22;
+            const tolMax = 58;
+
+            for (let i = 0; i < d.length; i += 4) {
+                const dist = Math.hypot(d[i] - bgR, d[i + 1] - bgG, d[i + 2] - bgB);
+                if (dist <= tolMin) {
+                    d[i + 3] = 0;
+                } else if (dist < tolMax) {
+                    const alphaFactor = (dist - tolMin) / (tolMax - tolMin);
+                    d[i + 3] = Math.round(255 * alphaFactor);
+                    const a = d[i + 3] / 255;
+                    if (a > 0) {
+                        d[i] = Math.max(0, Math.min(255, Math.round((d[i] - bgR * (1 - a)) / a)));
+                        d[i + 1] = Math.max(0, Math.min(255, Math.round((d[i + 1] - bgG * (1 - a)) / a)));
+                        d[i + 2] = Math.max(0, Math.min(255, Math.round((d[i + 2] - bgB * (1 - a)) / a)));
+                    }
+                }
+            }
+
+            ctx.putImageData(imgData, 0, 0);
+        }
+
+        /* ========================================================
+           100% सुरक्षित कट, कॉपी और पेस्ट (कोई स्क्रीन वाइट नहीं, कोई कोड नहीं)
+           ======================================================== */
         function copyMarqueeArea() {
             if (!currentSelection || currentSelection.w < 2 || currentSelection.h < 2) return;
             const { x, y, w, h } = currentSelection;
@@ -1436,51 +1676,133 @@
             internalClipboardCanvas.height = h;
             const ctx = internalClipboardCanvas.getContext('2d');
             ctx.drawImage(masterCanvas, x, y, w, h, 0, 0, w, h);
-            const imageData = ctx.getImageData(0, 0, w, h);
-            const backgroundRGB = parseHexToRGB(bgColor);
-            const cornerPixels = [
-                ctx.getImageData(0, 0, 1, 1).data,
-                ctx.getImageData(w - 1, 0, 1, 1).data,
-                ctx.getImageData(0, h - 1, 1, 1).data,
-                ctx.getImageData(w - 1, h - 1, 1, 1).data
-            ];
-            const cornerRGB = {
-                r: cornerPixels.reduce((sum, pixel) => sum + pixel[0], 0) / cornerPixels.length,
-                g: cornerPixels.reduce((sum, pixel) => sum + pixel[1], 0) / cornerPixels.length,
-                b: cornerPixels.reduce((sum, pixel) => sum + pixel[2], 0) / cornerPixels.length
-            };
-            for (let i = 0; i < imageData.data.length; i += 4) {
-                const color = imageData.data;
-                const matchesConfiguredBackground = colorDist(color[i], color[i + 1], color[i + 2], backgroundRGB.r, backgroundRGB.g, backgroundRGB.b) <= 70;
-                const matchesCornerBackground = colorDist(color[i], color[i + 1], color[i + 2], cornerRGB.r, cornerRGB.g, cornerRGB.b) <= 70;
-                if (matchesConfiguredBackground || matchesCornerBackground) {
-                    imageData.data[i + 3] = 0;
+
+            if (copyTransparentBackground) {
+                makeCanvasBackgroundTransparent(ctx, w, h);
+                showToast('शब्द पारदर्शी (Transparent) कॉपी किया गया ✓');
+            } else {
+                showToast('कॉपी किया गया ✓');
+            }
+        }
+
+        function copyCurrentSelection() {
+            if (activeTextElement) {
+                internalClipboardText = {
+                    text: activeTextElement.innerText,
+                    fontFamily: activeTextElement.style.fontFamily,
+                    fontSize: activeTextElement.style.fontSize,
+                    fontWeight: activeTextElement.style.fontWeight,
+                    letterSpacing: activeTextElement.style.letterSpacing,
+                    lineHeight: activeTextElement.style.lineHeight,
+                    color: activeTextElement.style.color,
+                    rotation: activeTextElement.dataset.rotation || '0'
+                };
+                internalClipboardType = 'text';
+                showToast('टेक्स्ट कॉपी किया गया ✓');
+                return;
+            }
+
+            if (activePastedElem) {
+                const img = activePastedElem.querySelector('img');
+                if (img) {
+                    internalClipboardDataUrl = img.src;
+                    internalClipboardW = parseFloat(activePastedElem.dataset.canvasW);
+                    internalClipboardH = parseFloat(activePastedElem.dataset.canvasH);
+                    internalClipboardType = 'image';
+                    showToast('ऑब्जेक्ट कॉपी किया गया ✓');
+                    return;
                 }
             }
-            ctx.putImageData(imageData, 0, 0);
-            showToast('कॉपी किया गया ✓');
+
+            if (currentSelection && currentSelection.w >= 2 && currentSelection.h >= 2) {
+                copyMarqueeArea();
+                internalClipboardType = 'marquee';
+            }
+        }
+
+        function cutCurrentSelection() {
+            if (activeTextElement) {
+                copyCurrentSelection();
+                activeTextElement.remove();
+                activeTextElement = null;
+                showToast('टेक्स्ट कट किया गया ✓');
+                return;
+            }
+
+            if (activePastedElem) {
+                copyCurrentSelection();
+                activePastedElem.remove();
+                activePastedElem = null;
+                showToast('ऑब्जेक्ट कट किया गया ✓');
+                return;
+            }
+
+            if (currentSelection && currentSelection.w >= 2 && currentSelection.h >= 2) {
+                if (currentSelection.w >= masterCanvas.width * 0.96 && currentSelection.h >= masterCanvas.height * 0.96) {
+                    showToast('पूरा पेज कट नहीं किया जा सकता');
+                    return;
+                }
+
+                copyMarqueeArea();
+                saveUndoState();
+
+                const tone = getCanvasSurroundingTone(
+                    currentSelection.x + currentSelection.w / 2,
+                    currentSelection.y + currentSelection.h / 2,
+                    Math.max(currentSelection.w, currentSelection.h) / 2 + 5
+                );
+                masterCtx.fillStyle = `rgb(${tone.r}, ${tone.g}, ${tone.b})`;
+                masterCtx.fillRect(currentSelection.x, currentSelection.y, currentSelection.w, currentSelection.h);
+
+                removeMarqueeDiv();
+                currentSelection = null;
+                showToast('शब्द कट किया गया ✓ (पारदर्शी पेस्ट हेतु तैयार)');
+            }
         }
 
         function cutMarqueeArea() {
-            if (!currentSelection) return;
-            copyMarqueeArea();
-            saveUndoState();
-            masterCtx.fillStyle = bgColor || '#ffffff';
-            masterCtx.fillRect(currentSelection.x, currentSelection.y, currentSelection.w, currentSelection.h);
-            removeMarqueeDiv();
-            currentSelection = null;
-            showToast('कट किया गया ✓');
+            cutCurrentSelection();
         }
 
         function pasteFromClipboard() {
-            if (!internalClipboardCanvas) return;
-            saveUndoState();
-            const w = internalClipboardCanvas.width;
-            const h = internalClipboardCanvas.height;
-            const x = Math.max(0, Math.min(masterCanvas.width - w, Math.round(lastCanvasPoint.x - w / 2)));
-            const y = Math.max(0, Math.min(masterCanvas.height - h, Math.round(lastCanvasPoint.y - h / 2)));
-            pasteImageToCanvasContainer(internalClipboardCanvas.toDataURL('image/png'), x, y, w, h);
-            showToast('पेस्ट किया गया ✓');
+            if (internalClipboardType === 'text' && internalClipboardText) {
+                const x = Math.max(0, Math.min(masterCanvas.width - 150, Math.round(lastCanvasPoint.x)));
+                const y = Math.max(0, Math.min(masterCanvas.height - 50, Math.round(lastCanvasPoint.y)));
+                createNewDirectTextAt(x, y);
+                if (activeTextElement) {
+                    activeTextElement.innerText = internalClipboardText.text;
+                    activeTextElement.style.fontFamily = internalClipboardText.fontFamily;
+                    activeTextElement.style.fontSize = internalClipboardText.fontSize;
+                    activeTextElement.style.fontWeight = internalClipboardText.fontWeight;
+                    activeTextElement.style.letterSpacing = internalClipboardText.letterSpacing;
+                    activeTextElement.style.lineHeight = internalClipboardText.lineHeight;
+                    activeTextElement.style.color = internalClipboardText.color;
+                    setSelectedRotation(parseInt(internalClipboardText.rotation || '0'));
+                }
+                showToast('टेक्स्ट पेस्ट किया गया ✓');
+                return;
+            }
+
+            if (internalClipboardType === 'image' && internalClipboardDataUrl) {
+                saveUndoState();
+                const w = internalClipboardW || 100;
+                const h = internalClipboardH || 100;
+                const x = Math.max(0, Math.min(masterCanvas.width - w, Math.round(lastCanvasPoint.x - w / 2)));
+                const y = Math.max(0, Math.min(masterCanvas.height - h, Math.round(lastCanvasPoint.y - h / 2)));
+                pasteImageToCanvasContainer(internalClipboardDataUrl, x, y, w, h);
+                showToast('ऑब्जेक्ट पेस्ट किया गया ✓');
+                return;
+            }
+
+            if (internalClipboardCanvas) {
+                saveUndoState();
+                const w = internalClipboardCanvas.width;
+                const h = internalClipboardCanvas.height;
+                const x = Math.max(0, Math.min(masterCanvas.width - w, Math.round(lastCanvasPoint.x - w / 2)));
+                const y = Math.max(0, Math.min(masterCanvas.height - h, Math.round(lastCanvasPoint.y - h / 2)));
+                pasteImageToCanvasContainer(internalClipboardCanvas.toDataURL('image/png'), x, y, w, h);
+                showToast('पारदर्शी शब्द पेस्ट किया गया ✓');
+            }
         }
 
         function removeMarqueeDiv() {
@@ -1654,11 +1976,14 @@
         }
 
         function undo() {
+            // कभी भी खाली सफेद पेज पर Undo न हो, खुली फ़ाइल हमेशा सुरक्षित रहे
             if (undoStack.length > 1) {
                 redoStack.push(undoStack.pop());
                 const prev = undoStack[undoStack.length - 1];
                 masterCtx.putImageData(prev, 0, 0);
                 showToast('Undo किया गया ✓');
+            } else {
+                showToast('शुरूआती दस्तावेज़ पर हैं');
             }
         }
 
@@ -1719,7 +2044,12 @@
                 masterCanvas.height = Math.round(viewport.height);
                 await page.render({ canvasContext: masterCtx, viewport }).promise;
             }
+
+            // फ़ाइल खुलने पर Undo स्टैक रीसेट ताकि Undo करने पर सफ़ेद स्क्रीन न आए
+            undoStack.length = 0;
+            redoStack.length = 0;
             saveUndoState();
+
             fitToScreen();
             updateDimensionLabel();
             showStatus('पेज लोड हुआ!');
@@ -1733,19 +2063,46 @@
             }
         }
 
-        /* ========================================================
-           अति-सटीक फ़्लैटन कैनवास (प्रिंट / एक्सपोर्ट में 100% सही वर्टिकल स्थिति)
-           ======================================================== */
+        function getElementRealBaseline(el) {
+            const savedTransform = el.style.transform;
+            el.style.transform = 'none';
+
+            let diff = 0;
+            try {
+                const testSpan = document.createElement('span');
+                testSpan.style.display = 'inline-block';
+                testSpan.style.width = '0px';
+                testSpan.style.height = '0px';
+                testSpan.style.verticalAlign = 'baseline';
+                el.appendChild(testSpan);
+                const spanRect = testSpan.getBoundingClientRect();
+                const elRect = el.getBoundingClientRect();
+                el.removeChild(testSpan);
+                diff = (spanRect.top - elRect.top) / currentScale;
+            } catch(err) {}
+
+            el.style.transform = savedTransform;
+
+            const fs = parseFloat(el.style.fontSize) || 18;
+            if (diff > 2 && diff < 250) return diff;
+            return fs * 0.82;
+        }
+
         async function getFlattenedCanvas() {
+            if (document.fonts && document.fonts.ready) {
+                await document.fonts.ready;
+            }
+
             const expCanvas = document.createElement('canvas');
             expCanvas.width = masterCanvas.width;
             expCanvas.height = masterCanvas.height;
             const expCtx = expCanvas.getContext('2d');
             expCtx.drawImage(masterCanvas, 0, 0);
 
-            // 1. पेस्ट की गई छवियाँ रोटेशन के साथ ड्रा करें
+            // 1. पेस्ट की गई छवियाँ
             document.querySelectorAll('.pasted-img-box').forEach(box => {
                 const img = box.querySelector('img');
+                if (!img) return;
                 const x = parseFloat(box.dataset.canvasX || (parseFloat(box.style.left) / 100) * masterCanvas.width);
                 const y = parseFloat(box.dataset.canvasY || (parseFloat(box.style.top) / 100) * masterCanvas.height);
                 const w = parseFloat(box.dataset.canvasW || (parseFloat(box.style.width) / 100) * masterCanvas.width);
@@ -1759,12 +2116,13 @@
                 expCtx.restore();
             });
 
-            // 2. टेक्स्ट एलिमेंट्स को उसी वास्तविक स्थिति पर ड्रा करें (वर्टिकल अलाइनमेंट एकदम सटीक)
+            // 2. टेक्स्ट एलिमेंट्स (रोटेशन के साथ 1:1 सटीक स्थिति)
             document.querySelectorAll('.seamless-text-item').forEach(el => {
                 const x = parseFloat(el.dataset.canvasX || (parseFloat(el.style.left) / 100) * masterCanvas.width);
                 const y = parseFloat(el.dataset.canvasY || (parseFloat(el.style.top) / 100) * masterCanvas.height);
                 const fontSize = parseFloat(el.style.fontSize) || 18;
-                const fontFamily = el.style.fontFamily || 'Inter';
+                let rawFont = el.style.fontFamily || 'Inter';
+                const cleanFont = rawFont.replace(/['"]/g, '').trim();
                 const fontWeight = el.style.fontWeight || '400';
                 const fontStyle = el.style.fontStyle || 'normal';
                 const color = el.style.color || '#000000';
@@ -1776,26 +2134,21 @@
                 expCtx.translate(x, y);
                 expCtx.rotate((rot * Math.PI) / 180);
 
-                expCtx.font = `${fontStyle} ${fontWeight} ${fontSize}px "${fontFamily}", sans-serif`;
+                expCtx.font = `${fontStyle} ${fontWeight} ${fontSize}px "${cleanFont}", "Tiro Devanagari Hindi", "Nirmala UI", "Mangal", sans-serif`;
                 expCtx.fillStyle = color;
-                
-                // स्क्रीन और कैनवास के बीच फ़ॉन्ट की प्राकृतिक बेसलाइन को जोड़ें
                 expCtx.textBaseline = 'alphabetic';
+
+                if ('letterSpacing' in expCtx) {
+                    expCtx.letterSpacing = `${letterSpacing}px`;
+                }
+
                 const lineHeight = fontSize * lineHeightMultiplier;
-                const baselineOffset = (lineHeight - fontSize) / 2 + fontSize * 0.95;
+                const baselineOffset = getElementRealBaseline(el);
 
                 const lines = el.innerText.split('\n');
                 lines.forEach((line, idx) => {
                     const lineY = baselineOffset + (idx * lineHeight);
-                    if (letterSpacing === 0) {
-                        expCtx.fillText(line, 0, lineY);
-                    } else {
-                        let curX = 0;
-                        for (const char of line) {
-                            expCtx.fillText(char, curX, lineY);
-                            curX += expCtx.measureText(char).width + letterSpacing;
-                        }
-                    }
+                    expCtx.fillText(line, 0, lineY);
                 });
 
                 expCtx.restore();
