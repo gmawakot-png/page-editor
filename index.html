@@ -1024,12 +1024,12 @@
 
         function isPixelTargetColor(r, g, b, targetRGB, tolerance) {
             const d = colorDist(r, g, b, targetRGB.r, targetRGB.g, targetRGB.b);
-            if (d <= Math.max(tolerance * 1.1, 100)) return true;
+            if (d <= tolerance) return true;
             const targetChroma = Math.max(targetRGB.r, targetRGB.g, targetRGB.b) - Math.min(targetRGB.r, targetRGB.g, targetRGB.b);
             const pixelChroma = Math.max(r, g, b) - Math.min(r, g, b);
             const targetLuminance = 0.299 * targetRGB.r + 0.587 * targetRGB.g + 0.114 * targetRGB.b;
             const pixelLuminance = 0.299 * r + 0.587 * g + 0.114 * b;
-            return targetChroma <= 30 && pixelChroma <= 8 && Math.abs(pixelLuminance - targetLuminance) <= 100;
+            return targetChroma <= 30 && pixelChroma <= 8 && Math.abs(pixelLuminance - targetLuminance) <= tolerance;
         }
 
         function getLocalBackgroundColor(data, width, height, px, py, targetRGB) {
