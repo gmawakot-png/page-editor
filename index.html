@@ -35,15 +35,15 @@
             src: local('Walkman-Chanakya-905'), local('Chanakya');
         }
         .custom-scrollbar::-webkit-scrollbar {
-            width: 5px;
-            height: 5px;
+            width: 4px;
+            height: 4px;
         }
         .custom-scrollbar::-webkit-scrollbar-track {
             background: #1e222b;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
             background: #3b4252;
-            border-radius: 3px;
+            border-radius: 2px;
         }
         .checkerboard {
             background-color: #23262d;
@@ -153,17 +153,18 @@
             box-shadow: 0 0 10px rgba(2, 132, 199, 0.4);
         }
         .sub-bar-btn {
-            padding: 4px 10px;
+            padding: 3px 8px;
             font-size: 11px;
             font-weight: 600;
             border-radius: 4px;
             display: inline-flex;
             align-items: center;
-            gap: 6px;
+            gap: 5px;
             color: #cbd5e1;
             background: #1e293b;
             border: 1px solid #334155;
             cursor: pointer;
+            white-space: nowrap;
             transition: all 0.15s ease;
         }
         .sub-bar-btn:hover { background: #334155; color: #ffffff; }
@@ -304,7 +305,7 @@
     </header>
 
     <!-- 2. टॉप ऑप्शन्स बार -->
-    <section id="topOptionsBar" class="h-10 bg-[#1e222b] border-b border-slate-800 flex items-center px-4 gap-3 text-xs shrink-0 z-40 overflow-x-auto custom-scrollbar">
+    <section id="topOptionsBar" class="h-10 bg-[#1e222b] border-b border-slate-800 flex items-center px-3 gap-2 text-xs shrink-0 z-40 overflow-x-auto overflow-y-hidden custom-scrollbar whitespace-nowrap">
     </section>
 
     <!-- 3. मुख्य कार्यक्षेत्र -->
@@ -340,7 +341,7 @@
             <div class="w-8 h-[1px] bg-slate-800 my-1"></div>
             <div class="flex flex-col items-center gap-1 mt-1" title="रंग बदलें">
                 <div class="relative w-7 h-7">
-                    <input type="color" id="globalFgPicker" value="#111827" onchange="updateGlobalColor('fg', this.value)" class="absolute top-0 left-0 w-4 h-4 p-0 border-0 rounded cursor-pointer z-10" title="ऊपर का रंग (स्याही/सुरक्षित रंग)">
+                    <input type="color" id="globalFgPicker" value="#111827" onchange="updateGlobalColor('fg', this.value)" class="absolute top-0 left-0 w-4 h-4 p-0 border-0 rounded cursor-pointer z-10" title="ऊपर का रंग (स्याही रंग)">
                     <input type="color" id="globalBgPicker" value="#ffffff" onchange="updateGlobalColor('bg', this.value)" class="absolute bottom-0 right-0 w-4 h-4 p-0 border-0 rounded cursor-pointer" title="नीचे का रंग (सफ़ेद/बैकग्राउंड)">
                 </div>
                 <span class="text-[9px] text-slate-400">रंग</span>
@@ -484,6 +485,18 @@
         let fgColor = '#111827';
         let bgColor = '#ffffff';
 
+        // --- स्टैम्प पैच और सुरक्षित रंग वेरिएबल्स ---
+        let useSampleStampPatch = false;
+        let isPickingStampPatch = false;
+        let stampPatchStart = null;
+        let stampPatchPreview = null;
+        let stampSamplePattern = null;
+        let stampSampleData = null;
+        let protectColorEnabled = false;
+        let protectColor = '#000000';
+        let protectTolerance = 35;
+
+        // --- सम्पूर्ण हिस्ट्री मैनेजमेंट (कैनवास + पेस्टेड ऑब्जेक्ट्स) ---
         const undoStack = [];
         const redoStack = [];
         const MAX_HISTORY = 25;
@@ -700,15 +713,13 @@
         function getRotationToolbarHTML() {
             const curRot = getSelectedRotation();
             return `
-                <div class="flex items-center gap-1.5 bg-[#181a1f] px-2 py-1 rounded border border-sky-700 ml-2" title="चयनित शब्द या ऑब्जेक्ट को घुमाएँ">
-                    <i class="fa-solid fa-rotate text-sky-400"></i>
-                    <span class="text-[10px] text-slate-400">घुमाएँ:</span>
-                    <button onclick="rotateSelectedObject(-90)" class="sub-bar-btn !px-1.5 !py-0.5" title="90 डिग्री बाएँ">-90°</button>
-                    <input id="objectRotationSlider" type="range" min="-180" max="180" value="${curRot}" oninput="setSelectedRotation(this.value)" class="w-16 accent-sky-500 h-1">
-                    <input id="objectRotationInput" type="number" min="-180" max="180" value="${curRot}" oninput="setSelectedRotation(this.value)" class="w-12 h-6 px-1 bg-[#121418] border border-slate-600 rounded text-[10px] text-sky-300 font-bold text-center">
-                    <span class="text-[10px] text-sky-300">°</span>
-                    <button onclick="rotateSelectedObject(90)" class="sub-bar-btn !px-1.5 !py-0.5" title="90 डिग्री दाएँ">+90°</button>
-                    <button onclick="setSelectedRotation(0)" class="sub-bar-btn !px-1.5 !py-0.5 text-amber-400" title="सीधा करें">0°</button>
+                <div class="flex items-center gap-1 bg-[#181a1f] px-1.5 py-0.5 rounded border border-sky-700 shrink-0" title="चयनित शब्द या ऑब्जेक्ट को घुमाएँ">
+                    <i class="fa-solid fa-rotate text-sky-400 text-[10px]"></i>
+                    <button onclick="rotateSelectedObject(-90)" class="sub-bar-btn !px-1 !py-0.5 text-[10px]" title="90 डिग्री बाएँ">-90°</button>
+                    <input id="objectRotationSlider" type="range" min="-180" max="180" value="${curRot}" oninput="setSelectedRotation(this.value)" class="w-14 accent-sky-500 h-1">
+                    <input id="objectRotationInput" type="number" min="-180" max="180" value="${curRot}" oninput="setSelectedRotation(this.value)" class="w-10 h-5 px-1 bg-[#121418] border border-slate-600 rounded text-[10px] text-sky-300 font-bold text-center">
+                    <button onclick="rotateSelectedObject(90)" class="sub-bar-btn !px-1 !py-0.5 text-[10px]" title="90 डिग्री दाएँ">+90°</button>
+                    <button onclick="setSelectedRotation(0)" class="sub-bar-btn !px-1 !py-0.5 text-amber-400 text-[10px]" title="सीधा करें">0°</button>
                 </div>
             `;
         }
@@ -717,94 +728,115 @@
             const bar = document.getElementById('topOptionsBar');
             bar.innerHTML = '';
             const group = document.createElement('div');
-            group.className = 'flex items-center gap-2 w-full flex-wrap';
+            group.className = 'flex items-center gap-2 w-max flex-nowrap shrink-0 py-0.5';
 
             if (tool === 'select') {
                 group.innerHTML = `
-                    <span class="text-sky-400 font-bold flex items-center gap-1"><i class="fa-solid fa-arrow-pointer"></i> चयन:</span>
-                    <span class="text-slate-400 text-[11px]">ऑब्जेक्ट्स या लिखे शब्दों को स्थानांतरित करें।</span>
+                    <span class="text-sky-400 font-bold flex items-center gap-1 shrink-0"><i class="fa-solid fa-arrow-pointer"></i> चयन:</span>
+                    <span class="text-slate-400 text-[11px] shrink-0">ऑब्जेक्ट्स या लिखे शब्दों को स्थानांतरित करें।</span>
                     ${getRotationToolbarHTML()}
                 `;
             } else if (tool === 'pan') {
                 group.innerHTML = `
-                    <span class="text-sky-400 font-bold flex items-center gap-1"><i class="fa-solid fa-hand"></i> पैन:</span>
-                    <span class="text-slate-400 text-[11px]">माउस खींचकर पेज खिसकाएँ।</span>
-                    <button onclick="fitToScreen()" class="sub-bar-btn"><i class="fa-solid fa-compress"></i> स्क्रीन फिट</button>
-                    <button onclick="resetZoom()" class="sub-bar-btn"><i class="fa-solid fa-expand"></i> 100% आकार</button>
+                    <span class="text-sky-400 font-bold flex items-center gap-1 shrink-0"><i class="fa-solid fa-hand"></i> पैन:</span>
+                    <span class="text-slate-400 text-[11px] shrink-0">माउस खींचकर पेज खिसकाएँ।</span>
+                    <button onclick="fitToScreen()" class="sub-bar-btn shrink-0"><i class="fa-solid fa-compress"></i> स्क्रीन फिट</button>
+                    <button onclick="resetZoom()" class="sub-bar-btn shrink-0"><i class="fa-solid fa-expand"></i> 100% आकार</button>
                 `;
             } else if (tool === 'marquee') {
                 group.innerHTML = `
-                    <span class="text-sky-400 font-bold flex items-center gap-1"><i class="fa-regular fa-square"></i> मार्की:</span>
-                    <button onclick="copyCurrentSelection()" class="sub-bar-btn"><i class="fa-solid fa-copy"></i> कॉपी</button>
-                    <button onclick="cutCurrentSelection()" class="sub-bar-btn"><i class="fa-solid fa-scissors"></i> कट</button>
-                    <button onclick="pasteFromClipboard()" class="sub-bar-btn"><i class="fa-solid fa-paste"></i> पेस्ट</button>
-                    <label class="flex items-center gap-1 text-[11px] font-bold cursor-pointer px-2 py-1 rounded border bg-sky-950/60 text-sky-300 border-sky-600 ml-1" title="कॉपी किया शब्द बिना किसी सफ़ेद/बैकग्राउंड बॉक्स के पारदर्शी पेस्ट होगा">
+                    <span class="text-sky-400 font-bold flex items-center gap-1 shrink-0"><i class="fa-regular fa-square"></i> मार्की:</span>
+                    <button onclick="copyCurrentSelection()" class="sub-bar-btn shrink-0"><i class="fa-solid fa-copy"></i> कॉपी</button>
+                    <button onclick="cutCurrentSelection()" class="sub-bar-btn shrink-0"><i class="fa-solid fa-scissors"></i> कट</button>
+                    <button onclick="pasteFromClipboard()" class="sub-bar-btn shrink-0"><i class="fa-solid fa-paste"></i> पेस्ट</button>
+                    <label class="flex items-center gap-1 text-[11px] font-bold cursor-pointer px-2 py-0.5 rounded border bg-sky-950/60 text-sky-300 border-sky-600 shrink-0" title="कॉपी किया शब्द बिना बैकग्राउंड के पारदर्शी पेस्ट होगा">
                         <input type="checkbox" id="chkCopyTransparent" ${copyTransparentBackground ? 'checked' : ''} onchange="toggleCopyTransparent(this.checked)" class="accent-sky-500 w-3.5 h-3.5">
-                        <i class="fa-solid fa-wand-magic-sparkles"></i> पारदर्शी (Transparent)
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> पारदर्शी
                     </label>
                     ${getRotationToolbarHTML()}
                 `;
             } else if (tool === 'clone') {
                 group.innerHTML = `
-                    <span class="text-sky-400 font-bold flex items-center gap-1"><i class="fa-solid fa-stamp"></i> क्लोन:</span>
-                    <div class="flex items-center gap-1 bg-[#181a1f] px-2 py-0.5 rounded border border-slate-700">
+                    <span class="text-sky-400 font-bold flex items-center gap-1 shrink-0"><i class="fa-solid fa-stamp"></i> क्लोन:</span>
+                    <div class="flex items-center gap-1 bg-[#181a1f] px-2 py-0.5 rounded border border-slate-700 shrink-0">
                         <span class="text-[10px] text-slate-400">आकार:</span>
-                        <input type="range" min="1" max="150" value="${cloneRadius}" oninput="updateCloneRadius(this.value)" class="w-20 accent-sky-500 h-1">
+                        <input type="range" min="1" max="150" value="${cloneRadius}" oninput="updateCloneRadius(this.value)" class="w-16 accent-sky-500 h-1">
                         <span id="cloneRadiusVal" class="font-bold text-[10px] text-sky-400">${cloneRadius}px</span>
                     </div>
-                    <span class="text-amber-400 text-[11px]"><i class="fa-solid fa-circle-info"></i> स्रोत चुनने हेतु <b>Alt + क्लिक</b> करें</span>
+                    <span class="text-amber-400 text-[11px] shrink-0"><i class="fa-solid fa-circle-info"></i> स्रोत चुनने हेतु <b>Alt + क्लिक</b> करें</span>
                 `;
             } else if (tool === 'eraser') {
                 group.innerHTML = `
-                    <span class="text-pink-400 font-bold flex items-center gap-1"><i class="fa-solid fa-eraser"></i> रबर:</span>
-                    <div class="flex items-center bg-[#181a1f] p-0.5 rounded border border-slate-700">
-                        <button onclick="setEraserType('brush')" class="px-2 py-0.5 rounded text-[10px] font-bold ${eraserType === 'brush' ? 'bg-pink-600 text-white' : 'text-slate-400'}">ब्रश</button>
-                        <button onclick="setEraserType('box')" class="px-2 py-0.5 rounded text-[10px] font-bold ${eraserType === 'box' ? 'bg-pink-600 text-white' : 'text-slate-400'}">बॉक्स एरिया</button>
+                    <span class="text-pink-400 font-bold flex items-center gap-1 shrink-0"><i class="fa-solid fa-eraser"></i> रबर:</span>
+                    
+                    <div class="flex items-center bg-[#181a1f] p-0.5 rounded border border-slate-700 shrink-0">
+                        <button onclick="setEraserType('brush')" class="px-1.5 py-0.5 rounded text-[10px] font-bold ${eraserType === 'brush' ? 'bg-pink-600 text-white' : 'text-slate-400'}">ब्रश</button>
+                        <button onclick="setEraserType('box')" class="px-1.5 py-0.5 rounded text-[10px] font-bold ${eraserType === 'box' ? 'bg-pink-600 text-white' : 'text-slate-400'}">बॉक्स</button>
                     </div>
-                    <div class="flex items-center gap-1 bg-[#181a1f] px-1.5 py-0.5 rounded border border-slate-700">
+
+                    <div class="flex items-center gap-1 bg-[#181a1f] px-1.5 py-0.5 rounded border border-slate-700 shrink-0">
                         <span class="text-[10px] text-slate-400">साइज:</span>
-                        <input type="range" min="1" max="150" value="${eraserBrushSize}" oninput="updateEraserBrushSize(this.value)" class="w-16 accent-pink-500 h-1">
+                        <input type="range" min="1" max="150" value="${eraserBrushSize}" oninput="updateEraserBrushSize(this.value)" class="w-14 accent-pink-500 h-1">
                         <span id="eraserSizeVal" class="font-bold text-[10px] text-pink-400">${eraserBrushSize}px</span>
                     </div>
-                    <label class="flex items-center gap-1 text-[11px] font-bold cursor-pointer px-2 py-0.5 rounded border ${magicEraserMode ? 'bg-amber-600 text-white' : 'bg-slate-800 text-slate-300 border-slate-600'}">
-                        <input type="checkbox" ${magicEraserMode ? 'checked' : ''} onchange="toggleMagicEraser(this.checked)" class="accent-amber-500 w-3.5 h-3.5">
-                        <i class="fa-solid fa-wand-magic-sparkles"></i> मैजिक रबर
+
+                    <label class="flex items-center gap-1 text-[10px] font-bold cursor-pointer px-1.5 py-0.5 rounded border shrink-0 ${magicEraserMode ? 'bg-amber-600 text-white' : 'bg-slate-800 text-slate-300 border-slate-600'}">
+                        <input type="checkbox" ${magicEraserMode ? 'checked' : ''} onchange="toggleMagicEraser(this.checked)" class="accent-amber-500 w-3 h-3">
+                        <span>मैजिक रबर</span>
                     </label>
-                    <label class="flex items-center gap-1 bg-emerald-900/50 text-emerald-200 px-2 py-1 rounded border border-emerald-700 cursor-pointer">
-                        <input type="checkbox" ${blendEraserWithCanvas ? 'checked' : ''} onchange="toggleEraserCanvasBlend(this.checked)" class="accent-emerald-500 w-3.5 h-3.5">
-                        <i class="fa-solid fa-droplet"></i> बैकग्राउंड से मिलाएँ
-                    </label>
-                    <button onclick="blurLastEraserArea()" class="sub-bar-btn"><i class="fa-solid fa-wand-magic-sparkles"></i> बॉक्स धुंधला</button>
-                    <button onclick="matchLastEraserAreaToBackground()" class="sub-bar-btn"><i class="fa-solid fa-fill-drip"></i> रंग मिलाएँ</button>
-                    <div class="flex items-center gap-1 bg-[#181a1f] px-2 py-1 rounded border border-amber-700">
+
+                    <!-- मिटाने वाला रंग और स्टैम्प पैच बॉक्स -->
+                    <div class="flex items-center gap-1.5 bg-[#181a1f] px-1.5 py-0.5 rounded border border-amber-700 shrink-0">
                         <span class="text-[10px] text-amber-400 font-bold">मिटाने वाला रंग:</span>
-                        <input type="color" id="eraserTargetColorDirect" value="${fgColor}" onchange="setMagicInkColorDirect(this.value)" class="w-5 h-5 p-0 border-0 rounded cursor-pointer">
-                        <button onclick="startInstantEyedropper('fg')" class="sub-bar-btn !px-1.5 !py-0.5 text-[10px]">पिक</button>
+                        <input type="color" id="eraserTargetColorDirect" value="${fgColor}" onchange="setMagicInkColorDirect(this.value)" class="w-4 h-4 p-0 border-0 rounded cursor-pointer">
+                        <button onclick="startInstantEyedropper('fg')" class="sub-bar-btn !px-1 !py-0.5 text-[10px]" title="रंग पिक करें">पिक</button>
+                        <div class="h-3.5 w-[1px] bg-slate-700 mx-0.5"></div>
+                        <label class="flex items-center gap-1 cursor-pointer text-[10px] font-bold text-sky-300 hover:text-white" title="पेज से बैकग्राउंड चुनकर स्टैम्प की तरह भरें">
+                            <input type="checkbox" id="chkSamplePatch" ${useSampleStampPatch ? 'checked' : ''} onchange="toggleSampleStampPatch(this.checked)" class="accent-sky-500 w-3 h-3">
+                            <span>सैंपल पैच (स्टैम्प)</span>
+                        </label>
+                        <button onclick="pickStampPatchArea()" class="sub-bar-btn !px-1.5 !py-0.5 text-[10px] bg-sky-900 border-sky-600 text-sky-200" title="कागज़ का साफ़ हिस्सा खींचकर चुनें">
+                            <i class="fa-solid fa-crop-simple"></i> पैच चुनें
+                        </button>
                     </div>
-                    <div class="flex items-center gap-1 bg-[#181a1f] px-2 py-1 rounded border border-violet-700" title="हल्के से गहरे शेड तक कितना रंग मिलाना है">
-                        <span class="text-[10px] text-violet-300 font-bold">मिटाने की गहराई:</span>
-                        <input type="range" min="1" max="120" value="${magicEraserTolerance}" oninput="updateMagicEraserTolerance(this.value)" class="w-20 accent-violet-500 h-1">
+
+                    <!-- न मिटने वाला रंग बॉक्स -->
+                    <div class="flex items-center gap-1.5 bg-[#181a1f] px-1.5 py-0.5 rounded border border-red-700 shrink-0" title="यह रंग स्टैम्प या रबर से बिल्कुल सुरक्षित रहेगा">
+                        <label class="flex items-center gap-1 cursor-pointer text-[10px] font-bold text-red-400">
+                            <input type="checkbox" id="chkProtectColor" ${protectColorEnabled ? 'checked' : ''} onchange="toggleProtectColor(this.checked)" class="accent-red-500 w-3 h-3">
+                            <span>न मिटने वाला रंग:</span>
+                        </label>
+                        <input type="color" id="protectColorDirect" value="${protectColor}" onchange="setProtectColorDirect(this.value)" class="w-4 h-4 p-0 border-0 rounded cursor-pointer">
+                        <button onclick="startInstantEyedropper('protect')" class="sub-bar-btn !px-1 !py-0.5 text-[10px]" title="सुरक्षित रंग पिक करें">पिक</button>
+                    </div>
+
+                    <div class="flex items-center gap-1 bg-[#181a1f] px-1.5 py-0.5 rounded border border-violet-700 shrink-0" title="हल्के से गहरे शेड तक गहराई">
+                        <span class="text-[10px] text-violet-300 font-bold">गहराई:</span>
+                        <input type="range" min="1" max="120" value="${magicEraserTolerance}" oninput="updateMagicEraserTolerance(this.value)" class="w-14 accent-violet-500 h-1">
                         <span id="magicToleranceVal" class="font-bold text-[10px] text-violet-300">${magicEraserTolerance}</span>
                     </div>
-                    <button onclick="resetMagicEraserPass()" class="sub-bar-btn !px-1.5 !py-0.5 text-[10px]" title="फिर से चुने हुए रंग से शुरुआत करें">
-                        <i class="fa-solid fa-rotate-left"></i> रीसेट
-                    </button>
-                    <div class="flex items-center gap-1 bg-[#181a1f] px-2 py-1 rounded border border-emerald-700">
+
+                    <label class="flex items-center gap-1 bg-emerald-900/40 text-emerald-200 px-1.5 py-0.5 rounded border border-emerald-700 cursor-pointer text-[10px] shrink-0">
+                        <input type="checkbox" ${blendEraserWithCanvas ? 'checked' : ''} onchange="toggleEraserCanvasBlend(this.checked)" class="accent-emerald-500 w-3 h-3">
+                        <span>बैकग्राउंड मिलाएँ</span>
+                    </label>
+
+                    <div class="flex items-center gap-1 bg-[#181a1f] px-1.5 py-0.5 rounded border border-emerald-700 shrink-0">
                         <span class="text-[10px] text-emerald-400 font-bold">सफ़ेद/बैकग्राउंड:</span>
-                        <input type="color" id="eraserColorDirect" value="${bgColor}" onchange="setEraserColorDirect(this.value)" class="w-5 h-5 p-0 border-0 rounded cursor-pointer">
-                        <button onclick="startInstantEyedropper('bg')" class="sub-bar-btn !px-1.5 !py-0.5 text-[10px]">पिक</button>
+                        <input type="color" id="eraserColorDirect" value="${bgColor}" onchange="setEraserColorDirect(this.value)" class="w-4 h-4 p-0 border-0 rounded cursor-pointer">
+                        <button onclick="startInstantEyedropper('bg')" class="sub-bar-btn !px-1 !py-0.5 text-[10px]">पिक</button>
                     </div>
                 `;
             } else if (tool === 'text') {
                 group.innerHTML = `
-                    <span class="text-sky-400 font-bold flex items-center gap-1"><i class="fa-solid fa-font"></i> टेक्स्ट टूल:</span>
-                    <div class="flex items-center gap-1 bg-[#181a1f] px-2 py-1 rounded border border-slate-700">
+                    <span class="text-sky-400 font-bold flex items-center gap-1 shrink-0"><i class="fa-solid fa-font"></i> टेक्स्ट टूल:</span>
+                    <div class="flex items-center gap-1 bg-[#181a1f] px-2 py-0.5 rounded border border-slate-700 shrink-0">
                         <label class="text-[10px] text-slate-400">साइज:</label>
-                        <input type="number" min="6" max="250" value="${textToolSize}" oninput="updateTextToolSize(this.value)" class="w-12 h-6 px-1 bg-[#121418] border border-slate-600 rounded text-[10px]">
+                        <input type="number" min="6" max="250" value="${textToolSize}" oninput="updateTextToolSize(this.value)" class="w-10 h-5 px-1 bg-[#121418] border border-slate-600 rounded text-[10px]">
                         <label class="text-[10px] text-slate-400 ml-1">मोटाई:</label>
-                        <input type="number" min="100" max="1000" step="100" value="${textToolWeight}" oninput="updateTextToolWeight(this.value)" class="w-14 h-6 px-1 bg-[#121418] border border-slate-600 rounded text-[10px]" title="100 से 1000 तक अक्षर की मोटाई">
+                        <input type="number" min="100" max="1000" step="100" value="${textToolWeight}" oninput="updateTextToolWeight(this.value)" class="w-12 h-5 px-1 bg-[#121418] border border-slate-600 rounded text-[10px]">
                         <label class="text-[10px] text-slate-400 ml-1">दूरी:</label>
-                        <input type="number" min="-10" max="100" step="0.5" value="${textToolSpacing}" oninput="updateTextToolSpacing(this.value)" class="w-12 h-6 px-1 bg-[#121418] border border-slate-600 rounded text-[10px]">
+                        <input type="number" min="-10" max="100" step="0.5" value="${textToolSpacing}" oninput="updateTextToolSpacing(this.value)" class="w-10 h-5 px-1 bg-[#121418] border border-slate-600 rounded text-[10px]">
                     </div>
                     ${getRotationToolbarHTML()}
                 `;
@@ -812,9 +844,37 @@
             bar.appendChild(group);
         }
 
+        function toggleSampleStampPatch(val) {
+            useSampleStampPatch = val;
+            if (val && !stampSampleData) {
+                pickStampPatchArea();
+            } else {
+                showToast(val ? 'स्टैम्प पैच मोड चालू ✓' : 'स्टैम्प पैच मोड बंद');
+            }
+        }
+
+        function pickStampPatchArea() {
+            isPickingStampPatch = true;
+            document.getElementById('mainViewport').style.cursor = 'crosshair';
+            showToast('कागज़ पर खींचकर (ड्रैग करके) स्टैम्प हेतु साफ़ हिस्सा चुनें');
+        }
+
+        function toggleProtectColor(val) {
+            protectColorEnabled = val;
+            showToast(val ? `न मिटने वाला रंग सुरक्षित (${protectColor}) चालू ✓` : 'रंग सुरक्षा बंद');
+        }
+
+        function setProtectColorDirect(hex) {
+            protectColor = hex;
+            protectColorEnabled = true;
+            const chk = document.getElementById('chkProtectColor');
+            if (chk) chk.checked = true;
+            showToast(`न मिटने वाला रंग सेट: ${hex}`);
+        }
+
         function toggleCopyTransparent(val) {
             copyTransparentBackground = val;
-            showToast(val ? 'पारदर्शी कॉपी चालू ✓ (बिना बैकग्राउंड बॉक्स)' : 'सामान्य कॉपी (सफ़ेद बॉक्स के साथ)');
+            showToast(val ? 'पारदर्शी कॉपी चालू ✓' : 'सामान्य कॉपी चालू');
         }
 
         function updateTextToolSize(v) {
@@ -869,7 +929,6 @@
             window.addEventListener('keydown', (e) => {
                 const isTyping = e.target.isContentEditable || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT';
                 
-                // स्पेस बार का डिफ़ॉल्ट स्क्रॉल हर स्थिति में रोकें
                 if (e.code === 'Space' && !isTyping) {
                     e.preventDefault();
                     if (!isSpacePressed) {
@@ -934,6 +993,19 @@
                     lastCanvasPoint = pos;
                 }
 
+                if (isPickingStampPatch && e.button === 0) {
+                    stampPatchStart = pos;
+                    if (stampPatchPreview) stampPatchPreview.remove();
+                    stampPatchPreview = document.createElement('div');
+                    stampPatchPreview.style.position = 'absolute';
+                    stampPatchPreview.style.border = '2px dashed #0284c7';
+                    stampPatchPreview.style.background = 'rgba(2, 132, 199, 0.2)';
+                    stampPatchPreview.style.pointerEvents = 'none';
+                    stampPatchPreview.style.zIndex = '9999';
+                    container.appendChild(stampPatchPreview);
+                    return;
+                }
+
                 if (eyeDropperModeTarget) {
                     pickColorFromCanvas(pos.x, pos.y, eyeDropperModeTarget);
                     eyeDropperModeTarget = null;
@@ -949,6 +1021,7 @@
                 }
 
                 if (currentTool === 'marquee' && e.button === 0) {
+                    deselectAllObjects(); // नया मार्की खींचते ही पुराने ऑब्जेक्ट्स तुरंत अनसेलेक्ट करें
                     isMarqueeActive = true;
                     marqueeStart = pos;
                     removeMarqueeDiv();
@@ -999,6 +1072,12 @@
                     cloneOffset = { x: pos.x - cloneSource.x, y: pos.y - cloneSource.y };
                     performCloneAt(pos.x, pos.y);
                 }
+
+                // बैकग्राउंड कैनवास पर क्लिक करने पर चयन हटाएं
+                if (currentTool === 'select' && e.target === masterCanvas) {
+                    deselectAllObjects();
+                    removeMarqueeDiv();
+                }
             });
 
             window.addEventListener('mousemove', (e) => {
@@ -1006,6 +1085,18 @@
                 const pos = getCanvasNativeCoordinates(e.clientX, e.clientY);
                 if (pos.x >= 0 && pos.y >= 0 && pos.x <= masterCanvas.width && pos.y <= masterCanvas.height) {
                     lastCanvasPoint = pos;
+                }
+
+                if (isPickingStampPatch && stampPatchStart && stampPatchPreview) {
+                    const x = Math.min(stampPatchStart.x, pos.x);
+                    const y = Math.min(stampPatchStart.y, pos.y);
+                    const w = Math.abs(pos.x - stampPatchStart.x);
+                    const h = Math.abs(pos.y - stampPatchStart.y);
+                    stampPatchPreview.style.left = `${(x / masterCanvas.width) * 100}%`;
+                    stampPatchPreview.style.top = `${(y / masterCanvas.height) * 100}%`;
+                    stampPatchPreview.style.width = `${(w / masterCanvas.width) * 100}%`;
+                    stampPatchPreview.style.height = `${(h / masterCanvas.height) * 100}%`;
+                    return;
                 }
 
                 if (currentTool === 'clone') updateCloneCursor(e.clientX, e.clientY);
@@ -1038,7 +1129,32 @@
             });
 
             window.addEventListener('mouseup', (e) => {
-                if (isMarqueeActive) isMarqueeActive = false;
+                if (isPickingStampPatch && stampPatchStart) {
+                    const pos = getCanvasNativeCoordinates(e.clientX, e.clientY);
+                    const x = Math.min(stampPatchStart.x, pos.x);
+                    const y = Math.min(stampPatchStart.y, pos.y);
+                    const w = Math.abs(pos.x - stampPatchStart.x);
+                    const h = Math.abs(pos.y - stampPatchStart.y);
+                    if (w > 4 && h > 4) {
+                        captureStampPatch(x, y, w, h);
+                    }
+                    if (stampPatchPreview) {
+                        stampPatchPreview.remove();
+                        stampPatchPreview = null;
+                    }
+                    isPickingStampPatch = false;
+                    stampPatchStart = null;
+                    document.getElementById('mainViewport').style.cursor = 'crosshair';
+                    return;
+                }
+
+                if (isMarqueeActive) {
+                    isMarqueeActive = false;
+                    // यदि मार्की बहुत छोटा है (जैसे सिर्फ क्लिक) तो उसे हटाएं
+                    if (!currentSelection || currentSelection.w < 3 || currentSelection.h < 3) {
+                        removeMarqueeDiv();
+                    }
+                }
 
                 if (isErasing) {
                     isErasing = false;
@@ -1057,6 +1173,20 @@
 
                 if (isCloning) isCloning = false;
             });
+        }
+
+        function captureStampPatch(x, y, w, h) {
+            const pCanvas = document.createElement('canvas');
+            pCanvas.width = w;
+            pCanvas.height = h;
+            const pCtx = pCanvas.getContext('2d');
+            pCtx.drawImage(masterCanvas, x, y, w, h, 0, 0, w, h);
+            stampSampleData = pCtx.getImageData(0, 0, w, h);
+            stampSamplePattern = masterCtx.createPattern(pCanvas, 'repeat');
+            useSampleStampPatch = true;
+            const chk = document.getElementById('chkSamplePatch');
+            if (chk) chk.checked = true;
+            showToast(`स्टैम्प पैच चुना गया (${w}x${h}px) ✓ अब स्टैम्प की तरह मिटाएँ`);
         }
 
         function rgbToHSV(r, g, b) {
@@ -1079,7 +1209,14 @@
             return Math.min(d, 360 - d);
         }
 
+        function isPixelProtected(r, g, b) {
+            if (!protectColorEnabled) return false;
+            const pRGB = parseHexToRGB(protectColor);
+            return colorDist(r, g, b, pRGB.r, pRGB.g, pRGB.b) <= protectTolerance;
+        }
+
         function isPixelTargetColor(r, g, b, targetRGB, tolerance) {
+            if (isPixelProtected(r, g, b)) return false;
             const d = colorDist(r, g, b, targetRGB.r, targetRGB.g, targetRGB.b);
             const targetChroma = Math.max(targetRGB.r, targetRGB.g, targetRGB.b) - Math.min(targetRGB.r, targetRGB.g, targetRGB.b);
             const pixelChroma = Math.max(r, g, b) - Math.min(r, g, b);
@@ -1138,6 +1275,20 @@
             }
         }
 
+        function getStampSamplePixel(globalX, globalY) {
+            if (!stampSampleData) return parseHexToRGB(bgColor);
+            const sw = stampSampleData.width;
+            const sh = stampSampleData.height;
+            const sx = ((globalX % sw) + sw) % sw;
+            const sy = ((globalY % sh) + sh) % sh;
+            const idx = (sy * sw + sx) * 4;
+            return {
+                r: stampSampleData.data[idx],
+                g: stampSampleData.data[idx + 1],
+                b: stampSampleData.data[idx + 2]
+            };
+        }
+
         function eraseAtPoint(cx, cy) {
             const r = Math.max(0.5, eraserBrushSize / 2);
             const x = Math.max(0, Math.floor(cx - r));
@@ -1146,7 +1297,7 @@
             const h = Math.min(masterCanvas.height - y, Math.max(1, Math.ceil(r * 2)));
             if (w <= 0 || h <= 0) return;
 
-            if (magicEraserMode) {
+            if (magicEraserMode || protectColorEnabled || useSampleStampPatch) {
                 const imgData = masterCtx.getImageData(x, y, w, h);
                 const d = imgData.data;
                 const source = new Uint8ClampedArray(d);
@@ -1159,8 +1310,24 @@
                         const distToCenter = Math.hypot(i - r, j - r);
                         if (distToCenter > r && r >= 1) continue;
                         const idx = (j * w + i) * 4;
-                        if (!isPixelTargetColor(d[idx], d[idx + 1], d[idx + 2], targetRGB, magicEraserTolerance)) continue;
-                        const replacement = blendEraserWithCanvas ? getLocalBackgroundColor(source, w, h, i, j, targetRGB) : autoTone;
+                        const globalPx = x + i;
+                        const globalPy = y + j;
+
+                        if (isPixelProtected(d[idx], d[idx + 1], d[idx + 2])) continue;
+
+                        if (magicEraserMode) {
+                            if (!isPixelTargetColor(d[idx], d[idx + 1], d[idx + 2], targetRGB, magicEraserTolerance)) continue;
+                        }
+
+                        let replacement;
+                        if (useSampleStampPatch && stampSampleData) {
+                            replacement = getStampSamplePixel(globalPx, globalPy);
+                        } else if (blendEraserWithCanvas) {
+                            replacement = getLocalBackgroundColor(source, w, h, i, j, targetRGB);
+                        } else {
+                            replacement = autoTone;
+                        }
+
                         d[idx] = replacement.r;
                         d[idx + 1] = replacement.g;
                         d[idx + 2] = replacement.b;
@@ -1170,7 +1337,11 @@
                 masterCtx.putImageData(imgData, x, y);
             } else {
                 masterCtx.save();
-                masterCtx.fillStyle = bgColor || '#ffffff';
+                if (useSampleStampPatch && stampSamplePattern) {
+                    masterCtx.fillStyle = stampSamplePattern;
+                } else {
+                    masterCtx.fillStyle = bgColor || '#ffffff';
+                }
                 masterCtx.beginPath();
                 masterCtx.arc(cx, cy, r, 0, Math.PI * 2);
                 masterCtx.fill();
@@ -1289,9 +1460,10 @@
         function eraseBoxArea(x, y, w, h) {
             saveUndoState();
             lastEraserArea = { x, y, w, h };
-            if (magicEraserMode) {
-                const targetRGB = parseHexToRGB(fgColor);
-                const replaceRGB = parseHexToRGB(bgColor);
+            const targetRGB = parseHexToRGB(fgColor);
+            const replaceRGB = parseHexToRGB(bgColor);
+
+            if (magicEraserMode || protectColorEnabled || useSampleStampPatch) {
                 const targetKey = fgColor.toLowerCase();
                 if (magicEraserLastTarget !== targetKey) {
                     magicEraserPass = 0;
@@ -1299,23 +1471,45 @@
                 }
                 const passTolerance = Math.min(255, magicEraserTolerance * (magicEraserPass + 1));
 
-                if (blendEraserWithCanvas) {
+                if (blendEraserWithCanvas && !useSampleStampPatch) {
                     inpaintMagicBox(x, y, w, h, targetRGB, passTolerance);
                 } else {
                     const imgData = masterCtx.getImageData(x, y, w, h);
                     const d = imgData.data;
-                    for (let i = 0; i < d.length; i += 4) {
-                        if (!isPixelTargetColor(d[i], d[i+1], d[i+2], targetRGB, passTolerance)) continue;
-                        d[i] = replaceRGB.r;
-                        d[i+1] = replaceRGB.g;
-                        d[i+2] = replaceRGB.b;
-                        d[i+3] = 255;
+                    for (let py = 0; py < h; py++) {
+                        for (let px = 0; px < w; px++) {
+                            const i = (py * w + px) * 4;
+                            const globalPx = x + px;
+                            const globalPy = y + py;
+
+                            if (isPixelProtected(d[i], d[i+1], d[i+2])) continue;
+
+                            if (magicEraserMode) {
+                                if (!isPixelTargetColor(d[i], d[i+1], d[i+2], targetRGB, passTolerance)) continue;
+                            }
+
+                            if (useSampleStampPatch && stampSampleData) {
+                                const sp = getStampSamplePixel(globalPx, globalPy);
+                                d[i] = sp.r;
+                                d[i+1] = sp.g;
+                                d[i+2] = sp.b;
+                            } else {
+                                d[i] = replaceRGB.r;
+                                d[i+1] = replaceRGB.g;
+                                d[i+2] = replaceRGB.b;
+                            }
+                            d[i+3] = 255;
+                        }
                     }
                     masterCtx.putImageData(imgData, x, y);
                 }
                 magicEraserPass++;
             } else {
-                masterCtx.fillStyle = bgColor || '#ffffff';
+                if (useSampleStampPatch && stampSamplePattern) {
+                    masterCtx.fillStyle = stampSamplePattern;
+                } else {
+                    masterCtx.fillStyle = bgColor || '#ffffff';
+                }
                 masterCtx.fillRect(x, y, w, h);
             }
             showToast(`एरिया साफ़ किया गया ✓ (लेवल ${magicEraserPass})`);
@@ -1419,7 +1613,7 @@
         function toggleMagicEraser(on) {
             magicEraserMode = on;
             renderTopOptionsBar('eraser');
-            showToast(magicEraserMode ? 'मैजिक रबर सक्रिय: चुना हुआ रंग मिटेगा' : 'सामान्य रबर सक्रिय');
+            showToast(magicEraserMode ? 'मैजिक रबर सक्रिय' : 'सामान्य रबर सक्रिय');
         }
 
         function setEraserColorDirect(col) {
@@ -1451,7 +1645,13 @@
         function startInstantEyedropper(targetType) {
             eyeDropperModeTarget = targetType;
             document.getElementById('mainViewport').style.cursor = 'crosshair';
-            showToast(targetType === 'bg' ? 'कागज़ पर क्लिक करके बैकग्राउंड रंग उठाएँ' : 'काले अक्षर पर क्लिक करके स्याही रंग उठाएँ');
+            if (targetType === 'bg') {
+                showToast('कागज़ पर क्लिक करके बैकग्राउंड रंग उठाएँ');
+            } else if (targetType === 'protect') {
+                showToast('उस अक्षर/रंग पर क्लिक करें जिसे सुरक्षित रखना (नहीं मिटाना) है');
+            } else {
+                showToast('काले अक्षर पर क्लिक करके मिटाने वाला स्याही रंग उठाएँ');
+            }
         }
 
         function pickColorFromCanvas(x, y, target) {
@@ -1459,6 +1659,7 @@
                 const px = masterCtx.getImageData(Math.floor(x), Math.floor(y), 1, 1).data;
                 const hex = rgbToHexValues(px[0], px[1], px[2]);
                 if (target === 'bg') setEraserColorDirect(hex);
+                else if (target === 'protect') setProtectColorDirect(hex);
                 else setMagicInkColorDirect(hex);
             } catch(e) {}
         }
@@ -1665,11 +1866,9 @@
             ctx.putImageData(imgData, 0, 0);
         }
 
-        /* ========================================================
-           100% सुरक्षित कट, कॉपी और पेस्ट (कोई स्क्रीन वाइट नहीं, कोई कोड नहीं)
-           ======================================================== */
+        /* 100% सुव्यवस्थित कट, कॉपी और पेस्ट */
         function copyMarqueeArea() {
-            if (!currentSelection || currentSelection.w < 2 || currentSelection.h < 2) return;
+            if (!currentSelection || currentSelection.w < 2 || currentSelection.h < 2) return false;
             const { x, y, w, h } = currentSelection;
             internalClipboardCanvas = document.createElement('canvas');
             internalClipboardCanvas.width = w;
@@ -1679,13 +1878,21 @@
 
             if (copyTransparentBackground) {
                 makeCanvasBackgroundTransparent(ctx, w, h);
-                showToast('शब्द पारदर्शी (Transparent) कॉपी किया गया ✓');
-            } else {
-                showToast('कॉपी किया गया ✓');
             }
+            internalClipboardType = 'marquee';
+            return true;
         }
 
         function copyCurrentSelection() {
+            // प्राथमिकता 1: यदि मार्की बॉक्स बना है तो मार्की का चयन ही कॉपी होगा
+            if (currentSelection && currentSelection.w >= 2 && currentSelection.h >= 2) {
+                if (copyMarqueeArea()) {
+                    showToast(copyTransparentBackground ? 'मार्की शब्द (पारदर्शी) कॉपी हुआ ✓' : 'मार्की शब्द कॉपी हुआ ✓');
+                    return;
+                }
+            }
+
+            // प्राथमिकता 2: यदि कोई टेक्स्ट सेलेक्टेड है
             if (activeTextElement) {
                 internalClipboardText = {
                     text: activeTextElement.innerText,
@@ -1702,6 +1909,7 @@
                 return;
             }
 
+            // प्राथमिकता 3: यदि पहले से पेस्ट किया हुआ ऑब्जेक्ट सेलेक्टेड है
             if (activePastedElem) {
                 const img = activePastedElem.querySelector('img');
                 if (img) {
@@ -1713,32 +1921,12 @@
                     return;
                 }
             }
-
-            if (currentSelection && currentSelection.w >= 2 && currentSelection.h >= 2) {
-                copyMarqueeArea();
-                internalClipboardType = 'marquee';
-            }
         }
 
         function cutCurrentSelection() {
-            if (activeTextElement) {
-                copyCurrentSelection();
-                activeTextElement.remove();
-                activeTextElement = null;
-                showToast('टेक्स्ट कट किया गया ✓');
-                return;
-            }
-
-            if (activePastedElem) {
-                copyCurrentSelection();
-                activePastedElem.remove();
-                activePastedElem = null;
-                showToast('ऑब्जेक्ट कट किया गया ✓');
-                return;
-            }
-
+            // प्राथमिकता 1: मार्की चयन कट करना
             if (currentSelection && currentSelection.w >= 2 && currentSelection.h >= 2) {
-                if (currentSelection.w >= masterCanvas.width * 0.96 && currentSelection.h >= masterCanvas.height * 0.96) {
+                if (currentSelection.w >= masterCanvas.width * 0.98 && currentSelection.h >= masterCanvas.height * 0.98) {
                     showToast('पूरा पेज कट नहीं किया जा सकता');
                     return;
                 }
@@ -1746,6 +1934,7 @@
                 copyMarqueeArea();
                 saveUndoState();
 
+                // बैकग्राउंड से ऑटो-टोन उठाकर खाली जगह भरना
                 const tone = getCanvasSurroundingTone(
                     currentSelection.x + currentSelection.w / 2,
                     currentSelection.y + currentSelection.h / 2,
@@ -1756,7 +1945,28 @@
 
                 removeMarqueeDiv();
                 currentSelection = null;
-                showToast('शब्द कट किया गया ✓ (पारदर्शी पेस्ट हेतु तैयार)');
+                showToast('शब्द कट किया गया ✓');
+                return;
+            }
+
+            // प्राथमिकता 2: टेक्स्ट कट करना
+            if (activeTextElement) {
+                copyCurrentSelection();
+                saveUndoState();
+                activeTextElement.remove();
+                activeTextElement = null;
+                showToast('टेक्स्ट कट किया गया ✓');
+                return;
+            }
+
+            // प्राथमिकता 3: पेस्ट किया गया ऑब्जेक्ट कट करना
+            if (activePastedElem) {
+                copyCurrentSelection();
+                saveUndoState();
+                activePastedElem.remove();
+                activePastedElem = null;
+                showToast('ऑब्जेक्ट कट किया गया ✓');
+                return;
             }
         }
 
@@ -1765,7 +1975,12 @@
         }
 
         function pasteFromClipboard() {
+            // पेस्ट करने से पहले पिछले सभी चयन और मार्की हटा दें
+            deselectAllObjects();
+            removeMarqueeDiv();
+
             if (internalClipboardType === 'text' && internalClipboardText) {
+                saveUndoState();
                 const x = Math.max(0, Math.min(masterCanvas.width - 150, Math.round(lastCanvasPoint.x)));
                 const y = Math.max(0, Math.min(masterCanvas.height - 50, Math.round(lastCanvasPoint.y)));
                 createNewDirectTextAt(x, y);
@@ -1794,15 +2009,18 @@
                 return;
             }
 
-            if (internalClipboardCanvas) {
+            if (internalClipboardType === 'marquee' && internalClipboardCanvas) {
                 saveUndoState();
                 const w = internalClipboardCanvas.width;
                 const h = internalClipboardCanvas.height;
                 const x = Math.max(0, Math.min(masterCanvas.width - w, Math.round(lastCanvasPoint.x - w / 2)));
                 const y = Math.max(0, Math.min(masterCanvas.height - h, Math.round(lastCanvasPoint.y - h / 2)));
                 pasteImageToCanvasContainer(internalClipboardCanvas.toDataURL('image/png'), x, y, w, h);
-                showToast('पारदर्शी शब्द पेस्ट किया गया ✓');
+                showToast('शब्द पेस्ट किया गया ✓');
+                return;
             }
+
+            showToast('क्लिपबोर्ड में कुछ नहीं है!');
         }
 
         function removeMarqueeDiv() {
@@ -1810,9 +2028,10 @@
                 marqueeDiv.remove();
                 marqueeDiv = null;
             }
+            currentSelection = null;
         }
 
-        function pasteImageToCanvasContainer(dataUrl, x, y, w, h) {
+        function pasteImageToCanvasContainer(dataUrl, x, y, w, h, initialRotation = '0') {
             deselectAllObjects();
             const container = document.getElementById('fullScreenCanvasContainer');
             const box = document.createElement('div');
@@ -1821,11 +2040,12 @@
             box.dataset.canvasY = y;
             box.dataset.canvasW = w;
             box.dataset.canvasH = h;
-            box.dataset.rotation = '0';
+            box.dataset.rotation = String(initialRotation);
             box.style.left = `${(x / masterCanvas.width) * 100}%`;
             box.style.top = `${(y / masterCanvas.height) * 100}%`;
             box.style.width = `${(w / masterCanvas.width) * 100}%`;
             box.style.height = `${(h / masterCanvas.height) * 100}%`;
+            box.style.transform = `rotate(${initialRotation}deg)`;
 
             const img = document.createElement('img');
             img.src = dataUrl;
@@ -1842,6 +2062,7 @@
                 if (isSpacePressed) return;
                 e.stopPropagation();
                 deselectAllObjects();
+                removeMarqueeDiv();
                 activePastedElem = box;
                 box.classList.add('selected');
                 renderTopOptionsBar(currentTool);
@@ -1870,13 +2091,18 @@
 
         function deleteSelected() {
             if (activeTextElement) {
+                saveUndoState();
                 activeTextElement.remove();
                 activeTextElement = null;
                 showToast('टेक्स्ट हटाया गया');
             } else if (activePastedElem) {
+                saveUndoState();
                 activePastedElem.remove();
                 activePastedElem = null;
                 showToast('ऑब्जेक्ट हटाया गया');
+            } else if (currentSelection) {
+                removeMarqueeDiv();
+                showToast('मार्की चयन हटाया गया');
             }
         }
 
@@ -1969,18 +2195,59 @@
             return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
         }
 
+        /* कैनवास + पेस्टेड ऑब्जेक्ट्स दोनों की स्थिति को स्नैपशॉट में सहेजना */
+        function captureOverlayState() {
+            const overlays = [];
+            document.querySelectorAll('.pasted-img-box').forEach(box => {
+                const img = box.querySelector('img');
+                if (img) {
+                    overlays.push({
+                        type: 'image',
+                        src: img.src,
+                        x: parseFloat(box.dataset.canvasX),
+                        y: parseFloat(box.dataset.canvasY),
+                        w: parseFloat(box.dataset.canvasW),
+                        h: parseFloat(box.dataset.canvasH),
+                        rotation: box.dataset.rotation || '0'
+                    });
+                }
+            });
+            return overlays;
+        }
+
+        function restoreOverlayState(overlays) {
+            document.querySelectorAll('.pasted-img-box').forEach(el => el.remove());
+            activePastedElem = null;
+            if (!overlays || !overlays.length) return;
+            overlays.forEach(item => {
+                if (item.type === 'image') {
+                    pasteImageToCanvasContainer(item.src, item.x, item.y, item.w, item.h, item.rotation);
+                }
+            });
+            deselectAllObjects();
+        }
+
         function saveUndoState() {
             if (undoStack.length >= MAX_HISTORY) undoStack.shift();
-            undoStack.push(masterCtx.getImageData(0, 0, masterCanvas.width, masterCanvas.height));
+            undoStack.push({
+                canvasData: masterCtx.getImageData(0, 0, masterCanvas.width, masterCanvas.height),
+                overlays: captureOverlayState()
+            });
             redoStack.length = 0;
         }
 
         function undo() {
-            // कभी भी खाली सफेद पेज पर Undo न हो, खुली फ़ाइल हमेशा सुरक्षित रहे
             if (undoStack.length > 1) {
-                redoStack.push(undoStack.pop());
+                const current = undoStack.pop();
+                redoStack.push({
+                    canvasData: masterCtx.getImageData(0, 0, masterCanvas.width, masterCanvas.height),
+                    overlays: captureOverlayState()
+                });
                 const prev = undoStack[undoStack.length - 1];
-                masterCtx.putImageData(prev, 0, 0);
+                masterCtx.putImageData(prev.canvasData, 0, 0);
+                restoreOverlayState(prev.overlays);
+                removeMarqueeDiv();
+                deselectAllObjects();
                 showToast('Undo किया गया ✓');
             } else {
                 showToast('शुरूआती दस्तावेज़ पर हैं');
@@ -1990,8 +2257,14 @@
         function redo() {
             if (redoStack.length > 0) {
                 const st = redoStack.pop();
-                undoStack.push(st);
-                masterCtx.putImageData(st, 0, 0);
+                undoStack.push({
+                    canvasData: masterCtx.getImageData(0, 0, masterCanvas.width, masterCanvas.height),
+                    overlays: captureOverlayState()
+                });
+                masterCtx.putImageData(st.canvasData, 0, 0);
+                restoreOverlayState(st.overlays);
+                removeMarqueeDiv();
+                deselectAllObjects();
                 showToast('Redo किया गया ✓');
             }
         }
@@ -2045,7 +2318,6 @@
                 await page.render({ canvasContext: masterCtx, viewport }).promise;
             }
 
-            // फ़ाइल खुलने पर Undo स्टैक रीसेट ताकि Undo करने पर सफ़ेद स्क्रीन न आए
             undoStack.length = 0;
             redoStack.length = 0;
             saveUndoState();
@@ -2099,7 +2371,6 @@
             const expCtx = expCanvas.getContext('2d');
             expCtx.drawImage(masterCanvas, 0, 0);
 
-            // 1. पेस्ट की गई छवियाँ
             document.querySelectorAll('.pasted-img-box').forEach(box => {
                 const img = box.querySelector('img');
                 if (!img) return;
@@ -2116,7 +2387,6 @@
                 expCtx.restore();
             });
 
-            // 2. टेक्स्ट एलिमेंट्स (रोटेशन के साथ 1:1 सटीक स्थिति)
             document.querySelectorAll('.seamless-text-item').forEach(el => {
                 const x = parseFloat(el.dataset.canvasX || (parseFloat(el.style.left) / 100) * masterCanvas.width);
                 const y = parseFloat(el.dataset.canvasY || (parseFloat(el.style.top) / 100) * masterCanvas.height);
